@@ -51,7 +51,7 @@ namespace Piper
 	}
 
 	File::File(const char* path, int flags) :
-		m_descriptor(open(path, flags)),
+		m_descriptor(::open(path, flags)),
 		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
@@ -68,7 +68,7 @@ namespace Piper
 	}
 
 	File::File(const char* path, int flags, mode_t mode) :
-		m_descriptor(open(path, flags, mode)),
+		m_descriptor(::open(path, flags, mode)),
 		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
@@ -87,7 +87,7 @@ namespace Piper
 	File::~File()
 	{
 		if (m_descriptor >= 3) {
-			close(m_descriptor);
+			::close(m_descriptor);
 		}
 	}
 

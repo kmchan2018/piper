@@ -43,7 +43,7 @@ volatile std::atomic_bool quit;
  * Handle signals by setting the quit flag.
  */
 void stop(int signum) {
-	fprintf(stderr, "INFO: Start program termination due to signal\n\n");
+	std::fprintf(stderr, "INFO: Start program termination due to signal\n\n");
 	quit = true;
 }
 
@@ -82,18 +82,18 @@ template<typename Executor, typename Operation> void complete_with_check(Executo
  */
 int create(int argc, char **argv) {
 	if (argc >= 6) {
-		unsigned int stride = atoi(argv[3]);
-		unsigned int capacity = atoi(argv[4]);
-		unsigned int period = atoi(argv[5]);
+		unsigned int stride = std::atoi(argv[3]);
+		unsigned int capacity = std::atoi(argv[4]);
+		unsigned int period = std::atoi(argv[5]);
 
 		if (stride == 0) {
-			fprintf(stderr, "ERROR: argument stride cannot be zero\n\n");
+			std::fprintf(stderr, "ERROR: argument stride cannot be zero\n\n");
 			return 2;
 		} else if (capacity < 2) {
-			fprintf(stderr, "ERROR: argument capacity cannot be zero\n\n");
+			std::fprintf(stderr, "ERROR: argument capacity cannot be zero\n\n");
 			return 2;
 		} else if (period == 0) {
-			fprintf(stderr, "ERROR: argument period cannot be zero\n\n");
+			std::fprintf(stderr, "ERROR: argument period cannot be zero\n\n");
 			return 2;
 		}
 
@@ -101,15 +101,15 @@ int create(int argc, char **argv) {
 			Piper::Backer backer(argv[2], stride + sizeof(Piper::Preamble), capacity, period);
 			return 0;
 		} catch (Piper::Exception& ex) {
-			fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
+			std::fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
 			return 3;
 		} catch (std::exception& ex) {
-			fprintf(stderr, "ERROR: cannot create pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot create pipe: %s\n\n", ex.what());
 			return 3;
 		}
 	} else {
-		fprintf(stderr, "ERROR: Missing arguments\n");
-		fprintf(stderr, "Usage: %s create <path> <stride> <capacity> <period>\n\n", argv[0]);
+		std::fprintf(stderr, "ERROR: Missing arguments\n");
+		std::fprintf(stderr, "Usage: %s create <path> <stride> <capacity> <period>\n\n", argv[0]);
 		return 1;
 	}
 }
@@ -170,15 +170,15 @@ int feed(int argc, char **argv) {
 
 			return 0;
 		} catch (Piper::Exception& ex) {
-			fprintf(stderr, "ERROR: cannot feed pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
+			std::fprintf(stderr, "ERROR: cannot feed pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
 			return 3;
 		} catch (std::exception& ex) {
-			fprintf(stderr, "ERROR: cannot feed pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot feed pipe: %s\n\n", ex.what());
 			return 3;
 		}
 	} else {
-		fprintf(stderr, "ERROR: Missing arguments\n");
-		fprintf(stderr, "Usage: %s feed <path>\n\n", argv[0]);
+		std::fprintf(stderr, "ERROR: Missing arguments\n");
+		std::fprintf(stderr, "Usage: %s feed <path>\n\n", argv[0]);
 		return 1;
 	}
 }
@@ -221,7 +221,7 @@ int drain(int argc, char **argv) {
 							check();
 						}
 					} else if (outlet.valid() == false && outlet.loss() > 0) {
-						fprintf(stderr, "WARN: discarding old data\n");
+						std::fprintf(stderr, "WARN: discarding old data\n");
 						outlet.recover(1);
 					} else {
 						Piper::Buffer view(outlet.view());
@@ -237,7 +237,7 @@ int drain(int argc, char **argv) {
 
 						outlet.drain();
 						bucket.spend(1);
-						fprintf(stderr, "INFO: latency = %0.2f ms\n", preamble.latency_ms());
+						std::fprintf(stderr, "INFO: latency = %0.2f ms\n", preamble.latency_ms());
 					}
 				} catch (Piper::EOFException& ex) {
 					break;
@@ -248,15 +248,15 @@ int drain(int argc, char **argv) {
 
 			return 0;
 		} catch (Piper::Exception& ex) {
-			fprintf(stderr, "ERROR: cannot drain pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
+			std::fprintf(stderr, "ERROR: cannot drain pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
 			return 3;
 		} catch (std::exception& ex) {
-			fprintf(stderr, "ERROR: cannot drain pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot drain pipe: %s\n\n", ex.what());
 			return 3;
 		}
 	} else {
-		fprintf(stderr, "ERROR: Missing arguments\n");
-		fprintf(stderr, "Usage: %s drain <path>\n\n", argv[0]);
+		std::fprintf(stderr, "ERROR: Missing arguments\n");
+		std::fprintf(stderr, "Usage: %s drain <path>\n\n", argv[0]);
 		return 1;
 	}
 }
@@ -266,18 +266,18 @@ int drain(int argc, char **argv) {
  * Main program.
  */
 int main(int argc, char **argv) {
-	if (argc >= 2 && strcmp(argv[1], "create") == 0) {
+	if (argc >= 2 && std::strcmp(argv[1], "create") == 0) {
 		return create(argc, argv);
-	} else if (argc >= 2 && strcmp(argv[1], "feed") == 0) {
+	} else if (argc >= 2 && std::strcmp(argv[1], "feed") == 0) {
 		return feed(argc, argv);
-	} else if (argc >= 2 && strcmp(argv[1], "drain") == 0) {
+	} else if (argc >= 2 && std::strcmp(argv[1], "drain") == 0) {
 		return drain(argc, argv);
 	} else if (argc >= 2) {
-		fprintf(stderr, "ERROR: Unknown subcommand %s\n", argv[1]);
-		fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "ERROR: Unknown subcommand %s\n", argv[1]);
+		std::fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
 		return 1;
 	} else {
-		fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
 		return 0;
 	}
 }

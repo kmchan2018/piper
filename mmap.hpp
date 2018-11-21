@@ -56,7 +56,7 @@ namespace Piper
 					throw InvalidArgumentException("invalid flags", "mmap.hpp", __LINE__);
 				} else if (0 != (flags & MAP_SHARED) && 0 != (flags & MAP_PRIVATE)) {
 					throw InvalidArgumentException("invalid flags", "mmap.hpp", __LINE__);
-				} else if ((pointer = mmap(0, size, prot, flags, file.descriptor(), offset)) == MAP_FAILED) {
+				} else if ((pointer = ::mmap(0, size, prot, flags, file.descriptor(), offset)) == MAP_FAILED) {
 					switch (errno) {
 						case EACCES: throw InvalidArgumentException("invalid file type", "mmap.hpp", __LINE__);
 						case EBADF: throw InvalidArgumentException("invalid file descriptor", "mmap.hpp", __LINE__);
@@ -75,7 +75,7 @@ namespace Piper
 			 */
 			inline ~MappedStruct()
 			{
-				munmap(m_pointer, m_size);
+				::munmap(m_pointer, m_size);
 			}
 
 			/**
@@ -186,7 +186,7 @@ namespace Piper
 					throw InvalidArgumentException("invalid flags", "mmap.hpp", __LINE__);
 				} else if (0 != (flags & MAP_SHARED) && 0 != (flags & MAP_PRIVATE)) {
 					throw InvalidArgumentException("invalid flags", "mmap.hpp", __LINE__);
-				} else if ((start = mmap(0, size, prot, flags, file.descriptor(), offset)) == MAP_FAILED) {
+				} else if ((start = ::mmap(0, size, prot, flags, file.descriptor(), offset)) == MAP_FAILED) {
 					switch (errno) {
 						case EACCES: throw InvalidArgumentException("invalid file type", "mmap.hpp", __LINE__);
 						case EBADF: throw InvalidArgumentException("invalid file descriptor", "mmap.hpp", __LINE__);
@@ -205,7 +205,7 @@ namespace Piper
 			 */
 			inline ~MappedBuffer()
 			{
-				munmap(m_start, m_size);
+				::munmap(m_start, m_size);
 			}
 
 			/**

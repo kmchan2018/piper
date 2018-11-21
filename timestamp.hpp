@@ -24,7 +24,7 @@ namespace Piper
 	Timestamp now()
 	{
 		struct timespec time;
-		clock_gettime(CLOCK_MONOTONIC, &time);
+		::clock_gettime(CLOCK_MONOTONIC, &time);
 		return Timestamp{ time.tv_sec * 1000000000L + time.tv_nsec };
 	}
 
