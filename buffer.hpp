@@ -248,6 +248,18 @@ namespace Piper
 	/**
 	 * Copy data from the source variable into the destination buffer.
 	 */
+	template<typename T> inline void copy(Buffer& destination, const T& source)
+	{
+		if (destination.size() >= sizeof(T)) {
+			std::memcpy(destination.start(), &source, sizeof(T));
+		} else {
+			throw InvalidArgumentException("source too large", "buffer.hpp", __LINE__);
+		}
+	}
+
+	/**
+	 * Copy data from the source variable into the destination buffer.
+	 */
 	template<typename T> inline void copy(Buffer& destination, const T* source)
 	{
 		if (destination.size() >= sizeof(T)) {
