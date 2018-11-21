@@ -5,18 +5,26 @@
 #define _BSD_SOURCE
 
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include "exception.hpp"
 #include "buffer.hpp"
+#include "transfer.hpp"
 #include "file.hpp"
 
 
-namespace Piper {
+namespace Piper
+{
 
 	//////////////////////////////////////////////////////////////////////////
 	//
@@ -28,50 +36,24 @@ namespace Piper {
 
 	//////////////////////////////////////////////////////////////////////////
 	//
-	// Read all operation implementation.
-	//
-	//////////////////////////////////////////////////////////////////////////
-
-	File::ReadAll::ReadAll(const File& file, char* buffer, size_t remainder) :
-		m_file(file),
-		m_buffer(buffer),
-		m_done(0),
-		m_remainder(remainder)
-	{
-		// empty
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	//
-	// Write all operation implementation.
-	//
-	//////////////////////////////////////////////////////////////////////////
-
-	File::WriteAll::WriteAll(const File& file, const char* buffer, size_t remainder) :
-		m_file(file),
-		m_buffer(buffer),
-		m_done(0),
-		m_remainder(remainder)
-	{
-		// empty
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	//
 	// File implementation.
 	//
 	//////////////////////////////////////////////////////////////////////////
 
 	File::File(int descriptor) :
-		m_descriptor(descriptor)
+		m_descriptor(descriptor),
+		m_blocking(true)
 	{
-		if (descriptor < 0) {
+		if (descriptor >= 0) {
+			fcntl(F_GETFL);
+		} else {
 			throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
 		}
 	}
 
 	File::File(const char* path, int flags) :
-		m_descriptor(open(path, flags))
+		m_descriptor(open(path, flags)),
+		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
 			switch (errno) {
@@ -87,7 +69,8 @@ namespace Piper {
 	}
 
 	File::File(const char* path, int flags, mode_t mode) :
-		m_descriptor(open(path, flags, mode))
+		m_descriptor(open(path, flags, mode)),
+		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
 			switch (errno) {
@@ -109,18 +92,87 @@ namespace Piper {
 		}
 	}
 
-	int File::read(Buffer destination)
+	int File::fcntl(int cmd)
 	{
-		ssize_t done = ::read(m_descriptor, destination.start(), destination.size());
+		int result = ::fcntl(m_descriptor, cmd);
 
-		if (done >= 0) {
+		if (cmd == F_GETFL && result >= 0) {
+			m_blocking = (0 == (result & O_NONBLOCK));
+			return result;
+		} else if (result >= 0) {
+			return result;
+		} else {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
+				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
+				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+			}
+		}
+	}
+
+	int File::fcntl(int cmd, int arg)
+	{
+		int result = ::fcntl(m_descriptor, cmd, arg);
+
+		if (cmd == F_GETFL && result >= 0) {
+			m_blocking = (0 == (result & O_NONBLOCK));
+			return result;
+		} else if (cmd == F_SETFL && result >= 0) {
+			m_blocking = (0 == (arg & O_NONBLOCK));
+			return result;
+		} else if (result >= 0) {
+			return result;
+		} else {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
+				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
+				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+			}
+		}
+	}
+
+	int File::fcntl(int cmd, void* arg)
+	{
+		int result = ::fcntl(m_descriptor, cmd, arg);
+
+		if (cmd == F_GETFL && result >= 0) {
+			m_blocking = (0 == (result & O_NONBLOCK));
+			return result;
+		} else if (result >= 0) {
+			return result;
+		} else {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
+				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
+				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+			}
+		}
+	}
+
+	size_t File::read(Buffer& buffer)
+	{
+		return read(std::move(buffer));
+	}
+
+	size_t File::read(Buffer&& buffer)
+	{
+		void* start = buffer.start();
+		size_t size = buffer.size();
+		ssize_t done = ::read(m_descriptor, start, size);
+
+		if (done > 0) {
 			return done;
-		} else if (errno == EINTR) {
+		} else if (done < 0 && errno == EINTR) {
 			return 0;
-		} else if (errno == EAGAIN) {
+		} else if (done < 0 && errno == EAGAIN) {
 			return 0;
-		} else if (errno == EWOULDBLOCK) {
+		} else if (done < 0 && errno == EWOULDBLOCK) {
 			return 0;
+		} else if (done == 0) {
+			throw EOFException("cannot read past the end of file", "file.cpp", __LINE__);
 		} else if (errno == EPERM) {
 			throw PermissionException("cannot read data from file due to permission", "file.cpp", __LINE__);
 		} else {
@@ -128,55 +180,119 @@ namespace Piper {
 		}
 	}
 
-	void File::read_all(Buffer destination)
+	void File::read(Destination& destination)
 	{
-		File::ReadAll operation = read_all_async(destination);
-		while (done(operation) == false) {
-			execute(operation);
-		}
+		read(std::move(destination));
 	}
 
-	File::ReadAll File::read_all_async(Buffer destination)
+	void File::read(Destination&& destination)
 	{
-		char* buffer = destination.start();
-		size_t remainder = destination.size();
-		return File::ReadAll(*this, buffer, remainder);
+		destination.consume(read(destination.data()));
 	}
 
-	bool File::done(File::ReadAll& operation)
+	void File::readall(Buffer& buffer)
 	{
-		if (this == &operation.m_file) {
-			return operation.m_remainder == 0;
-		} else {
-			throw InvalidArgumentException("invalid operation", "file.cpp", __LINE__);
-		}
+		readall(Destination(buffer));
 	}
 
-	void File::execute(File::ReadAll& operation)
+	void File::readall(Buffer&& buffer)
 	{
-		if (this == &operation.m_file) {
-			if (operation.m_remainder > 0) {
-				ssize_t done = ::read(m_descriptor, operation.m_buffer, operation.m_remainder);
-				if (done > 0) {
-					operation.m_buffer += done;
-					operation.m_done += done;
-					operation.m_remainder -= done;
-				} else if (done == 0) {
-					throw EOFException("end of file reached", "file.cpp", __LINE__);
-				} else if (errno == EPERM) {
-					throw PermissionException("cannot read data from file due to permission", "file.cpp", __LINE__);
-				} else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+		readall(Destination(buffer));
+	}
+
+	void File::readall(Destination& destination)
+	{
+		readall(std::move(destination));
+	}
+
+	void File::readall(Destination&& destination)
+	{
+		while (destination.remainder() > 0) {
+			if (m_blocking) {
+				read(destination);
+			} else {
+				// If the file is non-blocking, the read method will return immediately,
+				// turning this loop into a busy loop. To avoid this situation, we need
+				// to use poll(2) to yield to the operating system and wait until the
+				// descriptor is readable.
+
+				struct pollfd pollfd;
+				pollfd.fd = m_descriptor;
+				pollfd.events = POLLIN;
+
+				int result = ::poll(&pollfd, 1, -1);
+
+				if (result > 0 && (pollfd.revents & POLLIN) > 0) {
+					read(destination);
+				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
+					read(destination);
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
+					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+				} else if (result < 0 && errno != EINTR) {
 					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
 				}
 			}
-		} else {
-			throw InvalidArgumentException("invalid operation", "file.cpp", __LINE__);
 		}
 	}
 
-	int File::write(const Buffer& source)
+	void File::try_readall(Destination& destination)
 	{
-		ssize_t done = ::write(m_descriptor, source.start(), source.size());
+		try_readall(std::move(destination), -1);
+	}
+
+	void File::try_readall(Destination&& destination)
+	{
+		try_readall(destination, -1);
+	}
+
+	void File::try_readall(Destination& destination, int timeout)
+	{
+		try_readall(std::move(destination), timeout);
+	}
+
+	void File::try_readall(Destination&& destination, int timeout)
+	{
+		if (m_blocking && timeout >= 0) {
+			throw InvalidStateException("cannot read blocking descriptor with timeout", "file.cpp", __LINE__);
+		}
+
+		if (destination.remainder() > 0) {
+			if (m_blocking) {
+				read(destination);
+			} else {
+				// If the file is non-blocking, the read method will return immediately,
+				// turning this loop into a busy loop. To avoid this situation, we need
+				// to use poll(2) to yield to the operating system and wait until the
+				// descriptor is readable.
+
+				struct pollfd pollfd;
+				pollfd.fd = m_descriptor;
+				pollfd.events = POLLIN;
+
+				int result = ::poll(&pollfd, 1, timeout);
+
+				if (result > 0 && (pollfd.revents & POLLIN) > 0) {
+					read(destination);
+				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
+					read(destination);
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
+					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+				} else if (result < 0 && errno != EINTR) {
+					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+				}
+			}
+		}
+	}
+
+	size_t File::write(const Buffer& source)
+	{
+		const char* start = source.start();
+		size_t size = source.size();
+		ssize_t done = ::write(m_descriptor, start, size);
 
 		if (done >= 0) {
 			return done;
@@ -186,6 +302,8 @@ namespace Piper {
 			return 0;
 		} else if (errno == EWOULDBLOCK) {
 			return 0;
+		} else if (errno == EPIPE) {
+			throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
 		} else if (errno == EPERM) {
 			throw PermissionException("cannot write data to file due to permission", "file.cpp", __LINE__);
 		} else {
@@ -193,47 +311,106 @@ namespace Piper {
 		}
 	}
 
-	void File::write_all(Buffer source)
+	void File::write(Source& source)
 	{
-		File::WriteAll operation = write_all_async(source);
-		while (done(operation) == false) {
-			execute(operation);
-		}
+		write(std::move(source));
 	}
 
-	File::WriteAll File::write_all_async(Buffer source)
+	void File::write(Source&& source)
 	{
-		const char* buffer = source.start();
-		size_t remainder = source.size();
-		return File::WriteAll(*this, buffer, remainder);
+		source.consume(write(source.data()));
 	}
 
-	bool File::done(File::WriteAll& operation)
+	void File::writeall(const Buffer& buffer)
 	{
-		if (this == &operation.m_file) {
-			return operation.m_remainder == 0;
-		} else {
-			throw InvalidArgumentException("invalid operation", "file.cpp", __LINE__);
-		}
+		writeall(Source(buffer));
 	}
 
-	void File::execute(File::WriteAll& operation)
+	void File::writeall(Source& source)
 	{
-		if (this == &operation.m_file) {
-			if (operation.m_remainder > 0) {
-				ssize_t done = ::write(m_descriptor, operation.m_buffer, operation.m_remainder);
-				if (done > 0) {
-					operation.m_buffer += done;
-					operation.m_done += done;
-					operation.m_remainder -= done;
-				} else if (errno == EPERM) {
-					throw PermissionException("cannot write data to file due to permission", "file.cpp", __LINE__);
-				} else if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+		writeall(std::move(source));
+	}
+
+	void File::writeall(Source&& source)
+	{
+		while (source.remainder() > 0) {
+			if (m_blocking) {
+				write(source);
+			} else {
+				// If the file is non-blocking, the write method will return immediately,
+				// turning this loop into a busy loop. To avoid this situation, we need
+				// to use poll(2) to yield to the operating system and wait until the
+				// descriptor is writable.
+
+				struct pollfd pollfd;
+				pollfd.fd = m_descriptor;
+				pollfd.events = POLLOUT;
+
+				int result = ::poll(&pollfd, 1, -1);
+
+				if (result > 0 && (pollfd.revents & POLLOUT) > 0) {
+					write(source);
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
+					throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
+					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+				} else if (result < 0 && errno != EINTR) {
 					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
 				}
 			}
-		} else {
-			throw InvalidArgumentException("invalid operation", "file.cpp", __LINE__);
+		}
+	}
+
+	void File::try_writeall(Source& source)
+	{
+		try_writeall(std::move(source), -1);
+	}
+
+	void File::try_writeall(Source&& source)
+	{
+		try_writeall(source, -1);
+	}
+
+	void File::try_writeall(Source& source, int timeout)
+	{
+		try_writeall(std::move(source), timeout);
+	}
+
+	void File::try_writeall(Source&& source, int timeout)
+	{
+		if (m_blocking && timeout >= 0) {
+			throw InvalidStateException("cannot write blocking descriptor with timeout", "file.cpp", __LINE__);
+		}
+
+		if (source.remainder() > 0) {
+			if (m_blocking) {
+				write(source);
+			} else {
+				// If the file is non-blocking, the write method will return immediately,
+				// turning this loop into a busy loop. To avoid this situation, we need
+				// to use poll(2) to yield to the operating system and wait until the
+				// descriptor is writable.
+
+				struct pollfd pollfd;
+				pollfd.fd = m_descriptor;
+				pollfd.events = POLLOUT;
+
+				int result = ::poll(&pollfd, 1, -1);
+
+				if (result > 0 && (pollfd.revents & POLLOUT) > 0) {
+					write(source);
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
+					throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
+				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
+					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+				} else if (result < 0 && errno != EINTR) {
+					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+				}
+			}
 		}
 	}
 
@@ -241,26 +418,28 @@ namespace Piper {
 	{
 		if (::ftruncate(m_descriptor, length) < 0) {
 			switch (errno) {
-				case EINVAL: throw InvalidArgumentException("invalid length", "file.cpp", __LINE__);
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EROFS: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case ETXTBSY: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid descriptor or length", "file.cpp", __LINE__);
+				case EFBIG: throw InvalidArgumentException("invalid length", "file.cpp", __LINE__);
 				case EPERM: throw PermissionException("cannot truncate the file due to permission", "file.cpp", __LINE__);
 				default: throw SystemException("cannot truncate the file", "file.cpp", __LINE__);
 			}
 		}
 	}
 
-	int File::fcntl(int cmd)
+	void File::flush()
 	{
-		return ::fcntl(m_descriptor, cmd);
-	}
-
-	int File::fcntl(int cmd, int arg)
-	{
-		return ::fcntl(m_descriptor, cmd, arg);
-	}
-
-	int File::fcntl(int cmd, void* arg)
-	{
-		return ::fcntl(m_descriptor, cmd, arg);
+		if (::fsync(m_descriptor) < 0) {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EROFS: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EPERM: throw PermissionException("cannot flush the file due to permission", "file.cpp", __LINE__);
+				default: throw SystemException("cannot flush the file", "file.cpp", __LINE__);
+			}
+		}
 	}
 
 };

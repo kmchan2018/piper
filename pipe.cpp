@@ -85,7 +85,7 @@ namespace Piper
 		header.tickets = 1;
 		header.session = INVALID_SESSION_ID;
 
-		m_file.write_all(Buffer(&header));
+		m_file.writeall(Buffer(&header));
 		m_file.truncate(m_pagesize + m_stride * m_capacity);
 	}
 
@@ -95,7 +95,7 @@ namespace Piper
 		m_file(path, O_RDWR)
 	{
 		Header header;
-		m_file.read_all(Buffer(&header));
+		m_file.readall(Buffer(&header));
 
 		if (header.stride == 0) {
 			throw InvalidArgumentException("invalid file", "pipe.cpp", __LINE__);

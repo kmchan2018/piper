@@ -139,8 +139,8 @@ int feed(int argc, char **argv) {
 			Piper::File input(STDIN_FILENO);
 			Piper::TokenBucket bucket(10, 1, pipe.period());
 
-			const size_t preamble_size = sizeof(Preamble);
-			const size_t content_size = pipe.stride() - preamble_size;
+			const size_t head_size = sizeof(Preamble);
+			const size_t body_size = pipe.stride() - head_size;
 
 			quit = false;
 			signal(SIGTERM, stop);
@@ -148,7 +148,7 @@ int feed(int argc, char **argv) {
 			signal(SIGQUIT, stop);
 			signal(SIGHUP, stop);
 
-			input.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
+			//input.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
 			bucket.start();
 
 			while (quit == false) {
@@ -159,11 +159,19 @@ int feed(int argc, char **argv) {
 							check();
 						}
 					} else {
+						Piper::Timestamp start = Piper::now();
 						Piper::Buffer staging(inlet.staging());
-						Preamble* preamble = reinterpret_cast<Preamble*>(staging.start());
+						Piper::Buffer head(staging.head(head_size));
+						Piper::Buffer body(staging.tail(body_size));
+						Piper::Destination destination(body);
+						Preamble* preamble = reinterpret_cast<Preamble*>(head.start());
 
-						preamble->start = Piper::now();
-						complete_with_check(input, input.read_all_async(staging.tail(content_size)));
+						while (destination.remainder() > 0) {
+							input.try_readall(destination);
+							check();
+						}
+
+						preamble->start = start;
 						preamble->delivery = Piper::now();
 
 						inlet.flush();
@@ -204,8 +212,8 @@ int drain(int argc, char **argv) {
 			Piper::File output(STDOUT_FILENO);
 			Piper::TokenBucket bucket(10, 1, pipe.period());
 
-			const size_t preamble_size = sizeof(Preamble);
-			const size_t content_size = pipe.stride() - preamble_size;
+			const size_t head_size = sizeof(Preamble);
+			const size_t body_size = pipe.stride() - head_size;
 
 			quit = false;
 			signal(SIGTERM, stop);
@@ -213,7 +221,7 @@ int drain(int argc, char **argv) {
 			signal(SIGQUIT, stop);
 			signal(SIGHUP, stop);
 
-			output.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
+			//output.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
 			bucket.start();
 
 			while (quit == false) {
@@ -232,14 +240,21 @@ int drain(int argc, char **argv) {
 						fprintf(stderr, "WARN: discarding old data\n");
 						outlet.recover(1);
 					} else {
+						Piper::Timestamp now = Piper::now();
 						Piper::Buffer view(outlet.view());
-						Piper::Timestamp accepted = Piper::now();
-						Preamble* preamble = reinterpret_cast<Preamble*>(view.start());
+						Piper::Buffer head(view.head(head_size));
+						Piper::Buffer body(view.tail(body_size));
+						Piper::Source source(body);
+						Preamble* preamble = reinterpret_cast<Preamble*>(head.start());
 
-						complete_with_check(output, output.write_all_async(view.tail(content_size)));
+						while (source.remainder() > 0) {
+							output.try_writeall(source);
+							check();
+						}
+
 						outlet.drain();
 						bucket.spend(1);
-						fprintf(stderr, "INFO: latency = %d / %d ns\n", accepted - preamble->start, accepted - preamble->delivery);
+						fprintf(stderr, "INFO: latency = %d / %d ns\n", now - preamble->start, now - preamble->delivery);
 					}
 				} catch (Piper::EOFException& ex) {
 					break;

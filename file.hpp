@@ -1,5 +1,8 @@
 
 
+#include <cstddef>
+#include <cstdint>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -7,6 +10,8 @@
 #include <sys/types.h>
 
 #include "exception.hpp"
+#include "buffer.hpp"
+#include "transfer.hpp"
 
 
 #ifndef FILE_HPP_
@@ -22,38 +27,6 @@ namespace Piper
 	class File
 	{
 		public:
-
-			/**
-			 * Data class for current execution status of readall operations over file
-			 * instances.
-			 */
-			class ReadAll
-			{
-				public:
-					explicit ReadAll(const File& file, char* buffer, size_t remainder);
-				private:
-					friend class File;
-					const File& m_file;
-					char* m_buffer;
-					size_t m_done;
-					size_t m_remainder;
-			};
-
-			/**
-			 * Data class for current execution status of writeall operations over file
-			 * instances.
-			 */
-			class WriteAll
-			{
-				public:
-					explicit WriteAll(const File& file, const char* buffer, size_t remainder);
-				private:
-					friend class File;
-					const File& m_file;
-					const char* m_buffer;
-					size_t m_done;
-					size_t m_remainder;
-			};
 
 			/**
 			 * Construct a file instance from the file descriptor. Throws exception when
@@ -81,8 +54,7 @@ namespace Piper
 			~File();
 
 			/**
-			 * Return the descriptor managed by this file instance; return -1 when this
-			 * File instances is invalid.
+			 * Return the descriptor managed by this file instance.
 			 */
 			int descriptor() const noexcept
 			{
@@ -90,71 +62,12 @@ namespace Piper
 			}
 
 			/**
-			 * Read data from the file into the destination buffer. The method will
-			 * read data from the file once, deliver them into the buffer, and then
-			 * return the number of bytes read from the file.
+			 * Return the blocking mode of the descriptor.
 			 */
-			int read(Buffer destination);
-
-			/**
-			 * Read data from the file into the destination buffer. The method will
-			 * repeatedly read data from the file and deliver them into the buffer
-			 * until the whole buffer is filled.
-			 */
-			void read_all(Buffer destination);
-
-			/**
-			 * Read data from the file into the destination buffer. The method will
-			 * repeatedly read data from the file and deliver them into the buffer
-			 * until the whole buffer is filled.
-			 */
-			ReadAll read_all_async(Buffer destination);
-
-			/**
-			 * Return if the given readall operation is finished or not.
-			 */
-			bool done(ReadAll& operation);
-
-			/**
-			 * Execute the given readall operation.
-			 */
-			void execute(ReadAll& operation);
-
-			/**
-			 * Write data from the source buffer to the file. The method will write
-			 * the descriptor once for whatever that is available and return the
-			 * number of bytes written to the file.
-			 */
-			int write(const Buffer& source);
-
-			/**
-			 * Write data from the source buffer into the file. The method will
-			 * repeatedly fetch data from the buffer and write them into the file
-			 * until the whole buffer is processed.
-			 */
-			void write_all(Buffer source);
-
-			/**
-			 * Write data from the source buffer into the file. The method will
-			 * repeatedly fetch data from the buffer and write them into the file
-			 * until the whole buffer is processed.
-			 */
-			WriteAll write_all_async(Buffer source);
-
-			/**
-			 * Return if the given writeall operation is finished or not.
-			 */
-			bool done(WriteAll& operation);
-
-			/**
-			 * Execute the given writeall operation.
-			 */
-			void execute(WriteAll& operation);
-
-			/**
-			 * Truncate the descriptor to the given length.
-			 */
-			void truncate(std::size_t length);
+			bool blocking() const noexcept
+			{
+				return m_blocking;
+			}
 
 			/**
 			 * Configure the file descriptor.
@@ -171,6 +84,274 @@ namespace Piper
 			 */
 			int fcntl(int cmd, void* arg);
 
+			/**
+			 * Read data from the file into the buffer. The method will read data
+			 * from the file ONCE, save the result into the beginning of buffer and
+			 * return the number of bytes saved to the buffer. The method implements
+			 * slightly different behavior when the descriptor is under different
+			 * mode.
+			 *
+			 * When the descriptor is under blocking mode, the method will block
+			 * until enough data is read or when the process receives a POSIX
+			 * signal.
+			 *
+			 * On the other hand, when the descriptor is under non-blocking mode,
+			 * the method will save any available data and return immediately. In
+			 * this case the method may return without reading anything.
+			 */
+			std::size_t read(Buffer& buffer);
+
+			/**
+			 * Read data from the file into the buffer. The method will read data
+			 * from the file ONCE, save the result into the beginning of buffer and
+			 * return the number of bytes saved to the buffer. The method implements
+			 * slightly different behavior when the descriptor is under different
+			 * mode.
+			 *
+			 * When the descriptor is under blocking mode, the method will block
+			 * until enough data is read or when the process receives a POSIX
+			 * signal.
+			 *
+			 * On the other hand, when the descriptor is under non-blocking mode,
+			 * the method will save any available data and return immediately. In
+			 * this case the method may return without reading anything.
+			 */
+			std::size_t read(Buffer&& buffer);
+
+			/**
+			 * Read data from the file into the destination. The method will read
+			 * data from the file ONCE, save the result into the destination and 
+			 * update the destination counter accordingly. The method implements
+			 * slightly different behavior when the descriptor is under different
+			 * mode.
+			 *
+			 * When the descriptor is under blocking mode, the method will block
+			 * until enough data is read or when the process receives a POSIX
+			 * signal.
+			 *
+			 * On the other hand, when the descriptor is under non-blocking mode,
+			 * the method will save any available data and return immediately. In
+			 * this case the method may return without reading anything.
+			 */
+			void read(Destination& destination);
+
+			/**
+			 * Read data from the file into the destination. The method will read
+			 * data from the file ONCE, save the result into the destination and 
+			 * update the destination counter accordingly. The method implements
+			 * slightly different behavior when the descriptor is under different
+			 * mode.
+			 *
+			 * When the descriptor is under blocking mode, the method will block
+			 * until enough data is read or when the process receives a POSIX
+			 * signal.
+			 *
+			 * On the other hand, when the descriptor is under non-blocking mode,
+			 * the method will save any available data and return immediately. In
+			 * this case the method may return without reading anything.
+			 */
+			void read(Destination&& destination);
+
+			/**
+			 * Read data from the file into the buffer. The method will REPEATEDLY
+			 * read data from the file and save the result into the buffer. The
+			 * method will only return after the buffer is completely filled.
+			 */
+			void readall(Buffer& buffer);
+
+			/**
+			 * Read data from the file into the buffer. The method will REPEATEDLY
+			 * read data from the file and save the result into the buffer. The
+			 * method will only return after the buffer is completely filled.
+			 */
+			void readall(Buffer&& buffer);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * REPEATEDLY read data from the file, save the result into the
+			 * destination and update the destination counter accordingly. The
+			 * method will only return after the destination is completely filled.
+			 */
+			void readall(Destination& destination);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * REPEATEDLY read data from the file, save the result into the
+			 * destination and update the destination counter accordingly. The
+			 * method will only return after the destination is completely filled.
+			 */
+			void readall(Destination&& destination);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * attempt to read data from the file, save the result into the
+       * destination and update the destination counter accordingly. The
+			 * method will return when:
+			 *
+			 * 1. Some data is read into the destination; or
+			 * 2. The process receives POSIX signal.
+			 *
+			 * This call is equivalent to calling the `try_readall(Destination, int)`
+			 * method with timeout -1.
+			 */
+			void try_readall(Destination& destination);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * attempt to read data from the file, save the result into the
+       * destination and update the destination counter accordingly. The
+			 * method will return when:
+			 *
+			 * 1. Some data is read into the destination; or
+			 * 2. The process receives POSIX signal.
+			 *
+			 * This call is equivalent to calling the `try_readall(Destination, int)`
+			 * method with timeout -1.
+			 */
+			void try_readall(Destination&& destination);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * attempt to read data from the file, save the result into the
+       * destination and update the destination counter accordingly. The
+			 * method will return when:
+			 *
+			 * 1. Some data is read into the destination; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+ 			 * Note that the timeout accepts 2 special values. The timeout of 0
+			 * means no waiting. The timeout of -1 indicates that timeout is
+			 * not observed.
+			 */
+			void try_readall(Destination& destination, int timeout);
+
+			/**
+			 * Read data from the file into the destination. The method will
+			 * attempt to read data from the file, save the result into the
+       * destination and update the destination counter accordingly. The
+			 * method will return when:
+			 *
+			 * 1. Some data is read into the destination; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+ 			 * Note that the timeout accepts 2 special values. The timeout of 0
+			 * means no waiting. The timeout of -1 indicates that timeout is
+			 * not observed.
+			 */
+			void try_readall(Destination&& destination, int timeout);
+
+			/**
+			 * Write data from the buffer to the file. The method will write
+			 * the descriptor ONCE with data from the buffer and return the
+			 * number of bytes written.
+			 */
+			std::size_t write(const Buffer& source);
+
+			/**
+			 * Write data from the source to the file. The method will write
+			 * the descriptor ONCE with data from the source and update the
+			 * source counter accordingly.
+			 */
+			void write(Source& source);
+
+			/**
+			 * Write data from the source to the file. The method will write
+			 * the descriptor ONCE with data from the source and update the
+			 * source counter accordingly.
+			 */
+			void write(Source&& source);
+
+			/**
+			 * Write data from the buffer to the file. The method will REPEATEDLY
+			 * write the descriptor with data from the buffer. The method will only
+			 * return the buffer is completely written.
+			 */
+			void writeall(const Buffer& source);
+
+			/**
+			 * Write data from the source to the file. The method will REPEATEDLY
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will only return the source is
+			 * completely written.
+			 */
+			void writeall(Source& source);
+
+			/**
+			 * Write data from the source to the file. The method will REPEATEDLY
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will only return the source is
+			 * completely written.
+			 */
+			void writeall(Source&& source);
+
+			/**
+			 * Write data from the source to the file. The method will attempt to
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will return when:
+			 *
+			 * 1. Some data is written from the source; or
+			 * 2. The process receives posix signal.
+			 *
+			 * This call is equivalent to calling the `try_writeall(source, int)`
+			 * method with timeout -1.
+			 */
+			void try_writeall(Source& source);
+
+			/**
+			 * Write data from the source to the file. The method will attempt to
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will return when:
+			 *
+			 * 1. Some data is written from the source; or
+			 * 2. The process receives posix signal.
+			 *
+			 * This call is equivalent to calling the `try_writeall(source, int)`
+			 * method with timeout -1.
+			 */
+			void try_writeall(Source&& source);
+
+			/**
+			 * Write data from the source to the file. The method will attempt to
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will return when:
+			 *
+			 * 1. Some data is written from the source; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+ 			 * Note that the timeout accepts 2 special values. The timeout of 0
+			 * means no waiting. The timeout of -1 indicates that timeout is
+			 * not observed.
+			 */
+			void try_writeall(Source& source, int timeout);
+
+			/**
+			 * Write data from the source to the file. The method will attempt to
+			 * write the descriptor with data from the source and update the source
+			 * counter accordingly. The method will return when:
+			 *
+			 * 1. Some data is written from the source; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+ 			 * Note that the timeout accepts 2 special values. The timeout of 0
+			 * means no waiting. The timeout of -1 indicates that timeout is
+			 * not observed.
+			 */
+			void try_writeall(Source&& source, int timeout);
+
+			/**
+			 * Truncate the descriptor to the given length.
+			 */
+			void truncate(std::size_t length);
+
+			/**
+			 * Flush the descriptor.
+			 */
+			void flush();
+
 			File(const File& file) = delete;
 			File(File&& file) = delete;
 			File& operator=(const File& file) = delete;
@@ -178,6 +359,7 @@ namespace Piper
 
 		private:
 			int m_descriptor;
+			bool m_blocking;
 	};
 
 	/**
