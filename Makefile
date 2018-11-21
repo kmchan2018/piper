@@ -11,7 +11,7 @@ piper: file.o main.o pipe.o timer.o tokenbucket.o
 file.o: file.cpp file.hpp exception.hpp buffer.hpp transfer.hpp
 	g++ -std=c++11 -Wall -c file.cpp
 
-main.o: main.cpp exception.hpp exception.hpp buffer.hpp file.hpp mmap.hpp pipe.hpp timer.hpp tokenbucket.hpp
+main.o: main.cpp exception.hpp exception.hpp buffer.hpp file.hpp mmap.hpp pipe.hpp preamble.hpp timer.hpp timestamp.hpp tokenbucket.hpp
 	g++ -std=c++11 -Wall -c main.cpp
 
 pipe.o: pipe.cpp pipe.hpp exception.hpp buffer.hpp file.hpp mmap.hpp transfer.hpp

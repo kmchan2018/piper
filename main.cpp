@@ -17,11 +17,12 @@
 #include <unistd.h>
 
 #include "exception.hpp"
+#include "timestamp.hpp"
 #include "buffer.hpp"
 #include "file.hpp"
 #include "pipe.hpp"
 #include "tokenbucket.hpp"
-#include "timestamp.hpp"
+#include "preamble.hpp"
 
 
 /**
@@ -80,16 +81,6 @@ template<typename Executor, typename Operation> void complete_with_check(Executo
 
 
 /**
- * Block preamble.
- */
-struct Preamble
-{
-	Piper::Timestamp start;
-	Piper::Timestamp delivery;
-};
-
-
-/**
  * Create a new pipe.
  */
 int create(int argc, char **argv) {
@@ -110,7 +101,7 @@ int create(int argc, char **argv) {
 		}
 
 		try {
-			Piper::Backer backer(argv[2], stride + sizeof(Preamble), capacity, period);
+			Piper::Backer backer(argv[2], stride + sizeof(Piper::Preamble), capacity, period);
 			return 0;
 		} catch (Piper::Exception& ex) {
 			fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
@@ -139,7 +130,7 @@ int feed(int argc, char **argv) {
 			Piper::File input(STDIN_FILENO);
 			Piper::TokenBucket bucket(10, 1, pipe.period());
 
-			const size_t head_size = sizeof(Preamble);
+			const size_t head_size = sizeof(Piper::Preamble);
 			const size_t body_size = pipe.stride() - head_size;
 
 			quit = false;
@@ -159,21 +150,17 @@ int feed(int argc, char **argv) {
 							check();
 						}
 					} else {
-						Piper::Timestamp start = Piper::now();
 						Piper::Buffer staging(inlet.staging());
 						Piper::Buffer head(staging.head(head_size));
 						Piper::Buffer body(staging.tail(body_size));
 						Piper::Destination destination(body);
-						Preamble* preamble = reinterpret_cast<Preamble*>(head.start());
 
 						while (destination.remainder() > 0) {
 							input.try_readall(destination);
 							check();
 						}
 
-						preamble->start = start;
-						preamble->delivery = Piper::now();
-
+						copy(head, Piper::Preamble());
 						inlet.flush();
 						bucket.spend(1);
 					}
@@ -212,7 +199,7 @@ int drain(int argc, char **argv) {
 			Piper::File output(STDOUT_FILENO);
 			Piper::TokenBucket bucket(10, 1, pipe.period());
 
-			const size_t head_size = sizeof(Preamble);
+			const size_t head_size = sizeof(Piper::Preamble);
 			const size_t body_size = pipe.stride() - head_size;
 
 			quit = false;
@@ -240,12 +227,11 @@ int drain(int argc, char **argv) {
 						fprintf(stderr, "WARN: discarding old data\n");
 						outlet.recover(1);
 					} else {
-						Piper::Timestamp now = Piper::now();
 						Piper::Buffer view(outlet.view());
 						Piper::Buffer head(view.head(head_size));
 						Piper::Buffer body(view.tail(body_size));
+						Piper::Preamble preamble(head);
 						Piper::Source source(body);
-						Preamble* preamble = reinterpret_cast<Preamble*>(head.start());
 
 						while (source.remainder() > 0) {
 							output.try_writeall(source);
@@ -254,7 +240,7 @@ int drain(int argc, char **argv) {
 
 						outlet.drain();
 						bucket.spend(1);
-						fprintf(stderr, "INFO: latency = %d / %d ns\n", now - preamble->start, now - preamble->delivery);
+						fprintf(stderr, "INFO: latency = %0.2f ms\n", preamble.latency_ms());
 					}
 				} catch (Piper::EOFException& ex) {
 					break;
