@@ -56,26 +56,6 @@ void check() {
 	}
 }
 
-/**
- * Execute an operaton with periodic checks on the quit flag.
- */
-template<typename Executor, typename Operation> void complete_with_check(Executor& executor, Operation& operation) {
-	while (executor.done(operation) == false) {
-		executor.execute(operation);
-		check();
-	}
-}
-
-/**
- * Execute an operaton with periodic checks on the quit flag.
- */
-template<typename Executor, typename Operation> void complete_with_check(Executor& executor, Operation&& operation) {
-	while (executor.done(operation) == false) {
-		executor.execute(operation);
-		check();
-	}
-}
-
 
 /**
  * Create a new pipe.
@@ -136,7 +116,6 @@ int feed(int argc, char **argv) {
 			signal(SIGQUIT, stop);
 			signal(SIGHUP, stop);
 
-			//input.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
 			bucket.start();
 
 			while (quit == false) {
@@ -205,7 +184,6 @@ int drain(int argc, char **argv) {
 			signal(SIGQUIT, stop);
 			signal(SIGHUP, stop);
 
-			//output.fcntl(F_SETPIPE_SZ, ::sysconf(_SC_PAGESIZE));
 			bucket.start();
 
 			while (quit == false) {
