@@ -11,13 +11,10 @@
 #include <cstring>
 #include <exception>
 
-#include <errno.h>
-#include <sched.h>
 #include <signal.h>
 #include <unistd.h>
 
 #include "exception.hpp"
-#include "timestamp.hpp"
 #include "buffer.hpp"
 #include "file.hpp"
 #include "pipe.hpp"

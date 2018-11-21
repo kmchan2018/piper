@@ -1,26 +1,11 @@
 
 
-
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE
 #define _BSD_SOURCE
 
 
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <string>
-
-#include <errno.h>
-#include <inttypes.h>
-#include <poll.h>
-#include <time.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/timerfd.h>
-#include <sys/types.h>
 
 #include "exception.hpp"
 #include "timer.hpp"

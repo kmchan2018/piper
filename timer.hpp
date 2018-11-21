@@ -105,8 +105,8 @@ namespace Piper
 
 			std::uint64_t m_overrun;
 			char* m_destination;
-			unsigned int m_consumed;
-			unsigned int m_remainder;
+			std::size_t m_consumed;
+			std::size_t m_remainder;
 	};
 
 	/**

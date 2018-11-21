@@ -4,6 +4,8 @@
 #include <initializer_list>
 #include <utility>
 
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 
 #include "exception.hpp"

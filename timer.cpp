@@ -1,26 +1,15 @@
 
 
-
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE
 #define _BSD_SOURCE
 
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <string>
-
 #include <errno.h>
-#include <inttypes.h>
 #include <poll.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/stat.h>
 #include <sys/timerfd.h>
-#include <sys/types.h>
 
 #include "exception.hpp"
 #include "timer.hpp"
@@ -150,7 +139,6 @@ namespace Piper
 					m_destination = nullptr;
 					m_consumed = 0;
 					m_remainder = sizeof(m_overrun);
-					fprintf(stderr, "ERROR: %s\n", strerror(errno));
 					throw TimerException("cannot check timer", "timer.cpp", __LINE__);
 				}
 			} else if (available < 0 && errno != EINTR) {

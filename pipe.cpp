@@ -8,9 +8,8 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 
-#include <limits.h>
+#include <errno.h>
 #include <time.h>
 #include <unistd.h>
 
