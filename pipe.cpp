@@ -244,18 +244,6 @@ namespace Piper
 
 	//////////////////////////////////////////////////////////////////////////
 	//
-	// Wait operation implementation.
-	//
-	//////////////////////////////////////////////////////////////////////////
-
-	inline Outlet::Wait::Wait(const Outlet& outlet) :
-		m_outlet(outlet)
-	{
-		// empty
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	//
 	// Outlet implementation.
 	//
 	//////////////////////////////////////////////////////////////////////////
@@ -309,37 +297,58 @@ namespace Piper
 
 	void Outlet::wait()
 	{
-		Outlet::Wait operation = wait_async();
-		while (done(operation) == false) {
-			execute(operation);
+		while (m_reads >= m_pipe.until()) {
+			try_wait(-1);
 		}
 	}
 
-	Outlet::Wait Outlet::wait_async()
+	void Outlet::try_wait()
 	{
-		return Outlet::Wait(*this);
-	}
+		struct timespec wait;
+		int period = m_pipe.period();
 
-	bool Outlet::done(Outlet::Wait& operation)
-	{
-		if (this == &operation.m_outlet) {
-			return m_pipe.until() > m_reads;
-		} else {
-			throw InvalidArgumentException("invalid operation", "pipe.cpp", __LINE__);
-		}
-	}
+		while (m_reads >= m_pipe.until()) {
+			int limit = period * (m_pipe.active() ? 1 : 10);
 
-	void Outlet::execute(Outlet::Wait& operation)
-	{
-		if (this == &operation.m_outlet) {
-			if (m_pipe.until() <= m_reads) {
-				struct timespec wait;
-				wait.tv_sec = 0;
-				wait.tv_nsec = m_pipe.period() * 500000L * (m_pipe.active() ? 1L : 1L);
-				::nanosleep(&wait, NULL);
+			wait.tv_sec = limit / 1000;
+			wait.tv_nsec = (limit % 1000) * 1000000L;
+
+			if (::nanosleep(&wait, NULL) < 0) {
+				switch (errno) {
+					case EINTR: return;
+					case EINVAL: throw InvalidArgumentException("invalid argument??", "pipe.cpp", __LINE__);
+					default: throw SystemException("cannot wait", "pipe.cpp", __LINE__);
+				}
 			}
-		} else {
-			throw InvalidArgumentException("invalid operation", "pipe.cpp", __LINE__);
+		}
+	}
+
+	void Outlet::try_wait(int timeout)
+	{
+		struct timespec wait;
+		int period = m_pipe.period();
+
+		if (timeout == -1) {
+			try_wait();
+		}
+
+		while (timeout > 0) {
+			if (m_reads >= m_pipe.until()) {
+				int limit = period * (m_pipe.active() ? 1 : 10);
+				int slice = std::min(timeout, limit);
+
+				wait.tv_sec = slice / 1000;
+				wait.tv_nsec = (slice % 1000) * 1000000L;
+				timeout -= slice;
+
+				if (::nanosleep(&wait, NULL) < 0) {
+					switch (errno) {
+						case EINTR: return;
+						case EINVAL: throw InvalidArgumentException("invalid argument??", "pipe.cpp", __LINE__);
+						default: throw SystemException("cannot wait", "pipe.cpp", __LINE__);
+					}
+				}
+			}
 		}
 	}
 

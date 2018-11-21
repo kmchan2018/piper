@@ -335,17 +335,6 @@ namespace Piper
 		public:
 
 			/**
-			 * Information on a wait operation.
-			 */
-			class Wait {
-				public:
-					explicit inline Wait(const Outlet& outlet);
-				private:
-					friend class Outlet;
-					const Outlet& m_outlet;
-			};
-
-			/**
 			 * Construct a new inlet for the given pipe. The outlet will attempt to
 			 * set the current block to the last flushed block; if that fails, the
 			 * the current block will be the staging block.
@@ -380,24 +369,36 @@ namespace Piper
 			const Buffer view() const;
 
 			/**
-			 * Wait until some blocks are available for consumption.
+			 * Wait until some blocks are available for consumption. The method will
+			 * only return when the outlet contains data to read.
 			 */
 			void wait();
 
 			/**
-			 * Wait until some blocks are available for consumption.
+			 * Attempt to wait until some blocks are available for consumption. The
+			 * method will return only when:
+			 *
+			 * 1. The outlet contains data to read; or
+			 * 2. The process receives POSIX signal.
+			 *
+			 * This call is equivalent to calling the `try_wait(int)` method with
+			 * timeout -1.
 			 */
-			Wait wait_async();
+			void try_wait();
 
 			/**
-			 * Return if the wait operation is done.
+			 * Attempt to wait until some blocks are available for consumption. The
+			 * method will return only when:
+			 *
+			 * 1. The outlet contains data to read; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+			 * Note that the timeout accepts 2 special values. The timeout of 0 means
+			 * no waiting which makes no sense but accepted nontheless. The timeout of
+			 * -1 indicates that timeout is not observed.
 			 */
-			bool done(Wait& operation);
-
-			/**
-			 * Execute a single step of the wait operation.
-			 */
-			void execute(Wait& operation);
+			void try_wait(int timeout);
 
 			/**
 			 * Move to the next block.

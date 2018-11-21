@@ -224,7 +224,10 @@ int drain(int argc, char **argv) {
 							check();
 						}
 					} else if (outlet.valid() == false && outlet.available() == 0) {
-						complete_with_check(outlet, outlet.wait_async());
+						while (outlet.available() == 0) {
+							outlet.try_wait();
+							check();
+						}
 					} else if (outlet.valid() == false && outlet.loss() > 0) {
 						fprintf(stderr, "WARN: discarding old data\n");
 						outlet.recover(1);
