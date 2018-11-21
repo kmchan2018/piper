@@ -153,8 +153,11 @@ int feed(int argc, char **argv) {
 
 			while (quit == false) {
 				try {
-					if (bucket.filled() == false) {
-						complete_with_check(bucket, bucket.refill_async());
+					if (bucket.tokens() == 0) {
+						while (bucket.tokens() == 0) {
+							bucket.try_refill();
+							check();
+						}
 					} else {
 						Piper::Buffer staging(inlet.staging());
 						Preamble* preamble = reinterpret_cast<Preamble*>(staging.start());
@@ -215,8 +218,11 @@ int drain(int argc, char **argv) {
 
 			while (quit == false) {
 				try {
-					if (bucket.filled() == false) {
-						complete_with_check(bucket, bucket.refill_async());
+					if (bucket.tokens() == 0) {
+						while (bucket.tokens() == 0) {
+							bucket.try_refill();
+							check();
+						}
 					} else if (outlet.valid() == false && outlet.available() == 0) {
 						complete_with_check(outlet, outlet.wait_async());
 					} else if (outlet.valid() == false && outlet.loss() > 0) {

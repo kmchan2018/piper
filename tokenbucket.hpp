@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "exception.hpp"
+#include "timer.hpp"
 
 
 #ifndef TOKENBUCKET_H_
@@ -38,30 +39,15 @@ namespace Piper
 		public:
 
 			/**
-			 * Information for refill operations.
-			 */
-			class Refill
-			{
-				public:
-					explicit inline Refill(const TokenBucket& bucket);
-				private:
-					friend class TokenBucket;
-					const TokenBucket& m_bucket;
-					std::uint64_t m_overrun;
-					char* m_start;
-					std::size_t m_remainder;
-			};
-
-			/**
 			 * Construct a new token bucket with the given parameters and create the
 			 * necessary timer for its operation.
 			 */
 			TokenBucket(unsigned int capacity, unsigned int fill, unsigned int period);
 
 			/**
-			 * Destroy the token bucket and remove associated timer.
+			 * Return the timer of the token bucket.
 			 */
-			~TokenBucket();
+			const Timer& descriptor() const noexcept { return m_timer; }
 
 			/**
 			 * Return the amount of tokens the token bucket can hold.
@@ -74,25 +60,21 @@ namespace Piper
 			unsigned int fill() const noexcept { return m_fill; }
 
 			/**
-			 * Return the duration of a single time period.
-			 */
-			unsigned int period() const noexcept { return m_period; }
-
-			/**
 			 * Return the number of tokens in the token bucket.
 			 */
 			unsigned int tokens() const noexcept { return m_tokens; }
-
-			/**
-			 * Return whether the token bucket contains token or not.
-			 */
-			bool filled() const noexcept { return m_tokens > 0; }
 
 			/**
 			 * Start the token bucket and the associated timer. Throws timer exception
 			 * when the timer cannot be started.
 			 */
 			void start();
+
+			/**
+			 * Stop the token bucket and the associated timer. Throws timer exception
+			 * when the timer cannot be stopped.
+			 */
+			void stop();
 
 			/**
 			 * Spend the specified amount of tokens and deduct them from the token
@@ -102,35 +84,34 @@ namespace Piper
 			void spend(unsigned int amount);
 
 			/**
-			 * Refill the token bucket. The method will check the timer and replenish
-			 * the token bucket with overdue tokens. The method will block until
-			 * there are tokens to replenish.
+			 * Attempt to refill the token bucket. This method will check the timer
+			 * and replenish the token bucket with due tokens. The method will only
+			 * return when the bucket is refilled and no longer empty.
 			 */
 			void refill();
 
 			/**
-			 * Refill the token bucket. The method will check the timer and replenish
-			 * the token bucket with overdue tokens. The method will not block; it
-			 * will instead return an operation which can be executed in pieces via
-			 * the `done` and `execute` methods.
+			 * Attempt to refill the token bucket. This method will return only when:
+			 *
+			 * 1. The token bucket is refilled; or
+			 * 2. The process receives POSIX signal.
+			 *
+			 * This call is equivalent to calling the `try_refill(int)` method with
+			 * timeout -1.
 			 */
-			Refill refill_async();
+			void try_refill();
 
 			/**
-			 * Return if the given refill operation is done.
+			 * Attempt to refill the token bucket. This method will return only when:
+			 *
+			 * 1. The token bucket is refilled; or
+			 * 2. The process receives POSIX signal; or
+			 * 3. The specified timeout has elapsed.
+			 *
+			 * Note that the timeout accepts 2 special values. The timeout of 0 means
+			 * no waiting. The timeout of -1 indicates that timeout is not observed.
 			 */
-			bool done(Refill& operation);
-
-			/**
-			 * Execute a single part of the refill operation.
-			 */
-			void execute(Refill& operation);
-
-			/**
-			 * Stop the token bucket and the associated timer. Throws timer exception
-			 * when the timer cannot be stopped.
-			 */
-			void stop();
+			void try_refill(int timeout);
 
 			TokenBucket(const TokenBucket& bucket) = delete;
 			TokenBucket(TokenBucket&& bucket) = delete;
@@ -138,22 +119,10 @@ namespace Piper
 			TokenBucket& operator=(TokenBucket&& bucket) = delete;
 
 		private:
-			int m_timerfd;
+			Timer m_timer;
 			unsigned int m_capacity;
 			unsigned int m_fill;
-			unsigned int m_period;
 			unsigned int m_tokens;
-	};
-
-	/**
-	 * Exception indicating problem with timer. A token bucket employs an
-	 * internal timer to determine the elapsed time and the amount of tokens
-	 * to replenish. This exception represents some errors with that timer.
-	 */
-	class TimerException : public Exception
-	{
-		public:
-			using Exception::Exception;
 	};
 
 };
