@@ -10,8 +10,8 @@
 #include "mmap.hpp"
 
 
-#ifndef PIPE_H_
-#define PIPE_H_
+#ifndef PIPE_HPP_
+#define PIPE_HPP_
 
 
 namespace Piper

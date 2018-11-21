@@ -7,8 +7,8 @@
 #include "timer.hpp"
 
 
-#ifndef TOKENBUCKET_H_
-#define TOKENBUCKET_H_
+#ifndef TOKENBUCKET_HPP_
+#define TOKENBUCKET_HPP_
 
 
 namespace Piper

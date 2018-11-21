@@ -6,8 +6,8 @@
 #include "exception.hpp"
 
 
-#ifndef TIMER_H_
-#define TIMER_H_
+#ifndef TIMER_HPP_
+#define TIMER_HPP_
 
 
 namespace Piper
