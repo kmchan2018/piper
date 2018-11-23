@@ -1,4 +1,5 @@
 
 *.o
+libasound_module_pcm_piper.so
 piper
 

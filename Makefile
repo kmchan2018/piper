@@ -1,26 +1,38 @@
 
+CC="g++"
+OPTIONS="-DPIC -g"
 
-.PHONY: build
+.PHONY: build clean
 
 
 build: piper
 
+clean:
+	rm -rf piper libasound_module_pcm_piper.so
+	rm -rf file.o main.o pipe.o plugin.o timer.o tokenbucket.o
+
 piper: file.o main.o pipe.o timer.o tokenbucket.o
-	g++ -o piper main.o pipe.o timer.o tokenbucket.o file.o
+	$(CC) -o piper main.o pipe.o timer.o tokenbucket.o file.o
 
-file.o: file.cpp file.hpp exception.hpp buffer.hpp transfer.hpp
-	g++ -std=c++11 -Wall -c file.cpp
+libasound_module_pcm_piper.so: file.o pipe.o plugin.o timer.o
+	$(CC) -shared -Wl,-soname,libasound_module_pcm_piper.so -o libasound_module_pcm_piper.so file.o pipe.o plugin.o timer.o -lasound
 
-main.o: main.cpp exception.hpp exception.hpp buffer.hpp file.hpp mmap.hpp pipe.hpp preamble.hpp timer.hpp timestamp.hpp tokenbucket.hpp
-	g++ -std=c++11 -Wall -c main.cpp
+file.o: file.cpp buffer.hpp exception.hpp file.hpp transfer.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c file.cpp
 
-pipe.o: pipe.cpp pipe.hpp exception.hpp buffer.hpp file.hpp mmap.hpp transfer.hpp
-	g++ -std=c++11 -Wall -c pipe.cpp
+main.o: main.cpp buffer.hpp exception.hpp file.hpp mmap.hpp pipe.hpp preamble.hpp timer.hpp timestamp.hpp tokenbucket.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c main.cpp
 
-timer.o: timer.cpp timer.hpp exception.hpp
-	g++ -std=c++11 -Wall -c timer.cpp
+pipe.o: pipe.cpp buffer.hpp exception.hpp file.hpp mmap.hpp pipe.hpp transfer.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c pipe.cpp
 
-tokenbucket.o: tokenbucket.cpp tokenbucket.hpp exception.hpp timer.hpp
-	g++ -std=c++11 -Wall -c tokenbucket.cpp
+plugin.o: plugin.cpp buffer.hpp exception.hpp file.hpp mmap.hpp pipe.hpp preamble.hpp timer.hpp timestamp.hpp tokenbucket.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c plugin.cpp
+
+timer.o: timer.cpp exception.hpp timer.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c timer.cpp
+
+tokenbucket.o: tokenbucket.cpp exception.hpp timer.hpp tokenbucket.hpp
+	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c tokenbucket.cpp
 
 
