@@ -55,7 +55,7 @@ namespace Piper
 		interval.it_interval.tv_sec = m_period / 1000;
 		interval.it_interval.tv_nsec = (m_period % 1000) * 1000000L;
 
-		if (::timerfd_settime(m_descriptor, CLOCK_MONOTONIC, &interval, NULL) >= 0) {
+		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
 		} else {
 			throw TimerException("cannot start timer", "timer.cpp", __LINE__);
@@ -70,7 +70,7 @@ namespace Piper
 		interval.it_interval.tv_sec = 0;
 		interval.it_interval.tv_nsec = 0L;
 
-		if (::timerfd_settime(m_descriptor, CLOCK_MONOTONIC, &interval, NULL) >= 0) {
+		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
 		} else {
 			throw TimerException("cannot stop timer", "timer.cpp", __LINE__);
@@ -128,12 +128,6 @@ namespace Piper
 						m_consumed = 0;
 						m_remainder = sizeof(m_overrun);
 					}
-				} else if (received == 0) {
-					m_overrun = 0;
-					m_destination = nullptr;
-					m_consumed = 0;
-					m_remainder = sizeof(m_overrun);
-					throw TimerException("cannot check timer", "timer.cpp", __LINE__);
 				} else if (received < 0 && errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
 					m_overrun = 0;
 					m_destination = nullptr;
