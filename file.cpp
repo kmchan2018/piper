@@ -3,10 +3,13 @@
 #define _DEFAULT_SOURCE
 #define _XOPEN_SOURCE
 #define _BSD_SOURCE
+#define _FILE_OFFSET_BITS 64
 
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <utility>
 
 #include <errno.h>
@@ -147,6 +150,36 @@ namespace Piper
 				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
 				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
 				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+			}
+		}
+	}
+
+	std::uint64_t File::tell()
+	{
+		std::int64_t result = lseek(m_descriptor, 0, SEEK_CUR);
+
+		if (result >= 0) {
+			return std::uint64_t(result);
+		} else {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid origin", "file.cpp", __LINE__);
+				case ENXIO: throw InvalidArgumentException("invalid offset", "file.cpp", __LINE__);
+				case ESPIPE: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				default: throw SystemException("invalid offset", "file.cpp", __LINE__);
+			}
+		}
+	}
+
+	void File::seek(std::int64_t offset, int origin)
+	{
+		if (lseek(m_descriptor, offset, origin) == -1) {
+			switch (errno) {
+				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				case EINVAL: throw InvalidArgumentException("invalid origin", "file.cpp", __LINE__);
+				case ENXIO: throw InvalidArgumentException("invalid offset", "file.cpp", __LINE__);
+				case ESPIPE: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				default: throw SystemException("invalid offset", "file.cpp", __LINE__);
 			}
 		}
 	}

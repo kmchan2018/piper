@@ -1,6 +1,8 @@
 
 
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 
 #include "exception.hpp"
 #include "buffer.hpp"
@@ -76,6 +78,16 @@ namespace Piper
 			 * Configure the file descriptor.
 			 */
 			int fcntl(int cmd, void* arg);
+
+			/**
+			 * Return the current position of the file descriptor.
+			 */
+			std::uint64_t tell();
+
+			/**
+			 * Seek the file descriptor to the specified position.
+			 */
+			void seek(std::int64_t offset, int origin);
 
 			/**
 			 * Read data from the file into the buffer. The method will read data
