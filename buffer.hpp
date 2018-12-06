@@ -41,7 +41,9 @@ namespace Piper
 				m_start(reinterpret_cast<char*>(start)),
 				m_size(sizeof(T))
 			{
-				// empty
+				if (start == nullptr) {
+					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
+				}
 			}
 
 			/**
