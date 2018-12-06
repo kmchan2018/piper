@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 #include "exception.hpp"
@@ -35,18 +36,6 @@ namespace Piper
 		public:
 
 			/**
-			 * Construct a new buffer writing to the given variable.
-			 */
-			template<typename T> explicit inline Buffer(T* start) : 
-				m_start(reinterpret_cast<char*>(start)),
-				m_size(sizeof(T))
-			{
-				if (start == nullptr) {
-					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
-				}
-			}
-
-			/**
 			 * Construct a new buffer from its components. Throws invalid argument
 			 * exception when start and/or size is invalid.
 			 */
@@ -57,6 +46,38 @@ namespace Piper
 				} else if (size == 0) {
 					throw InvalidArgumentException("length should not be 0", "buffer.hpp", __LINE__);
 				}
+			}
+
+			/**
+			 * Construct a new buffer backed by the given pointer to struct.
+			 */
+			template<typename T> explicit inline Buffer(T* start) :
+				m_start(reinterpret_cast<char*>(start)),
+				m_size(sizeof(T))
+			{
+				if (start == nullptr) {
+					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
+				}
+			}
+
+			/**
+			 * Construct a new buffer backed by the given reference to struct.
+			 */
+			template<typename T> explicit inline Buffer(T& start) :
+				m_start(reinterpret_cast<char*>(&start)),
+				m_size(sizeof(T))
+			{
+				// empty
+			}
+
+			/**
+			 * Construct a new buffer backed by the given reference to struct.
+			 */
+			template<typename T> explicit inline Buffer(T&& start) :
+				m_start(reinterpret_cast<char*>(&start)),
+				m_size(sizeof(T))
+			{
+				// empty
 			}
 
 			/**
@@ -81,6 +102,60 @@ namespace Piper
 			inline char* start() noexcept
 			{
 				return m_start;
+			}
+
+			/**
+			 * Cast the buffer as a pointer to struct.
+			 */
+			template<typename T> inline const T* to_struct_pointer() const
+			{
+				void* start = m_start;
+				std::size_t size = m_size;
+
+				if (std::align(alignof(T), sizeof(T), start, size) == nullptr) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else if (start != m_start) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else if (size != m_size) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else {
+					return reinterpret_cast<T*>(m_start);
+				}
+			}
+
+			/**
+			 * Cast the buffer as a pointer to struct.
+			 */
+			template<typename T> inline T* to_struct_pointer()
+			{
+				void* start = m_start;
+				std::size_t size = m_size;
+
+				if (std::align(alignof(T), sizeof(T), start, size) == nullptr) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else if (start != m_start) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else if (size != m_size) {
+					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+				} else {
+					return reinterpret_cast<T*>(m_start);
+				}
+			}
+
+			/**
+			 * Cast the buffer as a reference to struct.
+			 */
+			template<typename T> inline const T& to_struct_reference() const
+			{
+				return *(to_struct_pointer<T>());
+			}
+
+			/**
+			 * Cast the buffer as a reference to struct.
+			 */
+			template<typename T> inline T& to_struct_reference()
+			{
+				return *(to_struct_pointer<T>());
 			}
 
 			/**
@@ -233,6 +308,7 @@ namespace Piper
 		private:
 			char* m_start;
 			std::size_t m_size;
+
 	};
 
 	/**

@@ -62,6 +62,15 @@ namespace Piper
 			using SystemException::SystemException;
 	};
 
+	/**
+	 * Exception for invalid struct alignment.
+	 */
+	class AlignmentException : public Exception
+	{
+		public:
+			using Exception::Exception;
+	};
+
 };
 
 
