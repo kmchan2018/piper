@@ -20,6 +20,12 @@ namespace Piper
 	typedef std::int64_t Timestamp;
 
 	/**
+	 * Duration represents a time period in nanoseconds. The type is always
+	 * 64-bit wide.
+	 */
+	typedef std::uint64_t Duration;
+
+	/**
 	 * Return the current timestamp.
 	 */
 	inline Timestamp now()
