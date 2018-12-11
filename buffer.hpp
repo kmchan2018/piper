@@ -39,7 +39,7 @@ namespace Piper
 			 * Construct a new buffer from its components. Throws invalid argument
 			 * exception when start and/or size is invalid.
 			 */
-			explicit inline Buffer(char* start, std::size_t size) : m_start(start), m_size(size)
+			explicit Buffer(char* start, std::size_t size) : m_start(start), m_size(size)
 			{
 				if (start == nullptr) {
 					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
@@ -86,7 +86,7 @@ namespace Piper
 			/**
 			 * Construct a new buffer backed by the given pointer to struct.
 			 */
-			template<typename T> explicit inline Buffer(T* start) :
+			template<typename T> explicit Buffer(T* start) :
 				m_start(reinterpret_cast<char*>(start)),
 				m_size(sizeof(T))
 			{
@@ -98,7 +98,7 @@ namespace Piper
 			/**
 			 * Construct a new buffer backed by the given reference to struct.
 			 */
-			template<typename T> explicit inline Buffer(T& start) :
+			template<typename T> explicit Buffer(T& start) :
 				m_start(reinterpret_cast<char*>(&start)),
 				m_size(sizeof(T))
 			{
@@ -108,7 +108,7 @@ namespace Piper
 			/**
 			 * Construct a new buffer backed by the given reference to struct.
 			 */
-			template<typename T> explicit inline Buffer(T&& start) :
+			template<typename T> explicit Buffer(T&& start) :
 				m_start(reinterpret_cast<char*>(&start)),
 				m_size(sizeof(T))
 			{
@@ -142,7 +142,7 @@ namespace Piper
 			/**
 			 * Returns the size of this buffer.
 			 */
-			inline std::size_t size() const noexcept
+			std::size_t size() const noexcept
 			{
 				return m_size;
 			}
@@ -150,7 +150,7 @@ namespace Piper
 			/**
 			 * Returns a pointer to the start of this buffer.
 			 */
-			inline const char* start() const noexcept
+			const char* start() const noexcept
 			{
 				return m_start;
 			}
@@ -158,7 +158,7 @@ namespace Piper
 			/**
 			 * Returns a pointer to the start of this buffer.
 			 */
-			inline char* start() noexcept
+			char* start() noexcept
 			{
 				return m_start;
 			}
@@ -166,7 +166,7 @@ namespace Piper
 			/**
 			 * Cast the buffer as a pointer to struct.
 			 */
-			template<typename T> inline const T* to_struct_pointer() const
+			template<typename T> const T* to_struct_pointer() const
 			{
 				void* start = m_start;
 				std::size_t size = m_size;
@@ -185,7 +185,7 @@ namespace Piper
 			/**
 			 * Cast the buffer as a pointer to struct.
 			 */
-			template<typename T> inline T* to_struct_pointer()
+			template<typename T> T* to_struct_pointer()
 			{
 				void* start = m_start;
 				std::size_t size = m_size;
@@ -204,7 +204,7 @@ namespace Piper
 			/**
 			 * Cast the buffer as a reference to struct.
 			 */
-			template<typename T> inline const T& to_struct_reference() const
+			template<typename T> const T& to_struct_reference() const
 			{
 				return *(to_struct_pointer<T>());
 			}
@@ -212,7 +212,7 @@ namespace Piper
 			/**
 			 * Cast the buffer as a reference to struct.
 			 */
-			template<typename T> inline T& to_struct_reference()
+			template<typename T> T& to_struct_reference()
 			{
 				return *(to_struct_pointer<T>());
 			}
@@ -222,7 +222,7 @@ namespace Piper
 			 * invalid argument exception when the offset extends past the end of
 			 * this buffer.
 			 */
-			inline const char* at(std::size_t offset) const
+			const char* at(std::size_t offset) const
 			{
 				if (offset < m_size) {
 					return m_start + offset;
@@ -236,7 +236,7 @@ namespace Piper
 			 * invalid argument exception when the offset extends past the end of
 			 * this buffer.
 			 */
-			inline char* at(std::size_t offset)
+			char* at(std::size_t offset)
 			{
 				if (offset < m_size) {
 					return m_start + offset;
@@ -249,7 +249,7 @@ namespace Piper
 			 * Returns a buffer representing the first n bytes of this buffer. Throws
 			 * exception when n is larger than the size of this buffer.
 			 */
-			inline const Buffer head(std::size_t size) const
+			const Buffer head(std::size_t size) const
 			{
 				if (size <= m_size) {
 					return Buffer(m_start, size);
@@ -262,7 +262,7 @@ namespace Piper
 			 * Returns a buffer representing the first n bytes of this buffer. Throws
 			 * exception when n is larger than the size of this buffer.
 			 */
-			inline Buffer head(std::size_t size)
+			Buffer head(std::size_t size)
 			{
 				if (size <= m_size) {
 					return Buffer(m_start, size);
@@ -275,7 +275,7 @@ namespace Piper
 			 * Returns a buffer representing the last n bytes of this buffer. Throws
 			 * exception when n is larger than the size of this buffer.
 			 */
-			inline const Buffer tail(std::size_t size) const
+			const Buffer tail(std::size_t size) const
 			{
 				if (size <= m_size) {
 					return Buffer(m_start + (m_size - size), size);
@@ -288,7 +288,7 @@ namespace Piper
 			 * Returns a buffer representing the last n bytes of this buffer. Throws
 			 * exception when n is larger than the size of this buffer.
 			 */
-			inline Buffer tail(std::size_t size)
+			Buffer tail(std::size_t size)
 			{
 				if (size <= m_size) {
 					return Buffer(m_start + (m_size - size), size);
@@ -302,7 +302,7 @@ namespace Piper
 			 * and with the given size. Throws exception when the slice extends
 			 * past the end of this buffer.
 			 */
-			inline const Buffer slice(std::size_t offset, std::size_t size) const
+			const Buffer slice(std::size_t offset, std::size_t size) const
 			{
 				if (offset >= m_size) {
 					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
@@ -318,7 +318,7 @@ namespace Piper
 			 * and with the given size. Throws exception when the slice extends
 			 * past the end of this buffer.
 			 */
-			inline Buffer slice(std::size_t offset, std::size_t size)
+			Buffer slice(std::size_t offset, std::size_t size)
 			{
 				if (offset >= m_size) {
 					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
@@ -358,7 +358,7 @@ namespace Piper
 			 * This method is used to support std::swap operation over buffer
 			 * instances.
 			 */
-			inline void swap(Buffer& other) noexcept
+			void swap(Buffer& other) noexcept
 			{
 				std::swap(m_start, other.m_start);
 				std::swap(m_size, other.m_size);
