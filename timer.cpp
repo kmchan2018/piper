@@ -77,6 +77,13 @@ namespace Piper
 		}
 	}
 
+	unsigned int Timer::consume()
+	{
+		unsigned int ticks = m_ticks;
+		m_ticks = 0;
+		return ticks;
+	}
+
 	void Timer::clear()
 	{
 		m_ticks = 0;

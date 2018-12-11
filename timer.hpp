@@ -58,6 +58,11 @@ namespace Piper
 			void stop();
 
 			/**
+			 * Clear all accumulated ticks and return the amount of ticks cleared.
+			 */
+			unsigned int consume();
+
+			/**
 			 * Clear all accumulated ticks.
 			 */
 			void clear();
