@@ -13,8 +13,9 @@ namespace Piper
 {
 
 	/**
-	 * Timestamp is a simple struct that represents a specific point of time.
-	 * The value is specified as the duration from a system-local epoch.
+	 * Timestamp is a 64-bit integer that represents a specific point of time.
+	 * The value is specified as the nanosecond duration from a system-local
+	 * epoch.
 	 */
 	typedef std::int64_t Timestamp;
 
