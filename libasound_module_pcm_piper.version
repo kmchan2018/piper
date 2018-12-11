@@ -1,0 +1,6 @@
+
+ASOUND_MODULE_PCM_PIPERAPI_1.0 {
+	global: *_snd_pcm_piper_open*;
+	local: *;
+};
+

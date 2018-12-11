@@ -14,8 +14,8 @@ clean:
 piper: file.o main.o pipe.o timer.o tokenbucket.o transport.o
 	$(CC) -g -o piper file.o main.o pipe.o timer.o tokenbucket.o transport.o -lasound
 
-libasound_module_pcm_piper.so: file.o pipe.o plugin.o timer.o transport.o
-	$(CC) -shared -Wl,-soname,libasound_module_pcm_piper.so -o libasound_module_pcm_piper.so file.o pipe.o plugin.o timer.o transport.o -lasound
+libasound_module_pcm_piper.so: file.o pipe.o plugin.o timer.o transport.o libasound_module_pcm_piper.version
+	$(CC) -shared -Wl,-soname,libasound_module_pcm_piper.so -Wl,--version-script=libasound_module_pcm_piper.version -o libasound_module_pcm_piper.so file.o pipe.o plugin.o timer.o transport.o -lasound
 
 file.o: file.cpp buffer.hpp exception.hpp file.hpp transfer.hpp
 	$(CC) -std=c++11 -Wall -fPIC $(OPTIONS) -c file.cpp
