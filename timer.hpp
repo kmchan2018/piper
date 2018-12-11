@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "exception.hpp"
+#include "timestamp.hpp"
 
 
 #ifndef TIMER_HPP_
@@ -23,7 +24,7 @@ namespace Piper
 			/**
 			 * Construct a new timer with the given period.
 			 */
-			Timer(unsigned int period);
+			Timer(Duration period);
 
 			/**
 			 * Destroy the timer.
@@ -38,7 +39,7 @@ namespace Piper
 			/**
 			 * Return the period of the timer.
 			 */
-			unsigned int period() const noexcept { return m_period; }
+			Duration period() const noexcept { return m_period; }
 
 			/**
 			 * Return the number of ticks accumulated by the timer.
@@ -105,7 +106,7 @@ namespace Piper
 
 		private:
 			int m_descriptor;
-			unsigned int m_period;
+			Duration m_period;
 			unsigned int m_ticks;
 
 			std::uint64_t m_overrun;

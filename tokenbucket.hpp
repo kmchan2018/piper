@@ -1,6 +1,7 @@
 
 
 #include "exception.hpp"
+#include "timestamp.hpp"
 #include "timer.hpp"
 
 
@@ -39,7 +40,7 @@ namespace Piper
 			 * Construct a new token bucket with the given parameters and create the
 			 * necessary timer for its operation.
 			 */
-			TokenBucket(unsigned int capacity, unsigned int fill, unsigned int period);
+			TokenBucket(unsigned int capacity, unsigned int fill, Duration period);
 
 			/**
 			 * Return the timer of the token bucket.

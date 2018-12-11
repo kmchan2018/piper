@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "exception.hpp"
+#include "timestamp.hpp"
 #include "timer.hpp"
 #include "tokenbucket.hpp"
 
@@ -21,7 +22,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	TokenBucket::TokenBucket(unsigned int capacity, unsigned int fill, unsigned int period) :
+	TokenBucket::TokenBucket(unsigned int capacity, unsigned int fill, Duration period) :
 		m_timer(period),
 		m_capacity(capacity),
 		m_fill(fill),

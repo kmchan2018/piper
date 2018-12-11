@@ -12,6 +12,7 @@
 #include <sys/timerfd.h>
 
 #include "exception.hpp"
+#include "timestamp.hpp"
 #include "timer.hpp"
 
 
@@ -24,7 +25,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	Timer::Timer(unsigned int period) :
+	Timer::Timer(Duration period) :
 		m_descriptor(::timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK)),
 		m_period(period),
 		m_ticks(0),
@@ -50,10 +51,10 @@ namespace Piper
 	void Timer::start()
 	{
 		struct itimerspec interval;
-		interval.it_value.tv_sec = m_period / 1000;
-		interval.it_value.tv_nsec = (m_period % 1000) * 1000000L;
-		interval.it_interval.tv_sec = m_period / 1000;
-		interval.it_interval.tv_nsec = (m_period % 1000) * 1000000L;
+		interval.it_value.tv_sec = m_period / 1000000000;
+		interval.it_value.tv_nsec = m_period % 1000000000;
+		interval.it_interval.tv_sec = m_period / 1000000000;
+		interval.it_interval.tv_nsec = m_period % 1000000000;
 
 		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
@@ -66,9 +67,9 @@ namespace Piper
 	{
 		struct itimerspec interval;
 		interval.it_value.tv_sec = 0;
-		interval.it_value.tv_nsec = 0L;
+		interval.it_value.tv_nsec = 0;
 		interval.it_interval.tv_sec = 0;
-		interval.it_interval.tv_nsec = 0L;
+		interval.it_interval.tv_nsec = 0;
 
 		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
