@@ -280,7 +280,6 @@ int drain(int argc, char **argv) {
 						std::fprintf(stderr, "WARNING: discarding old data\n");
 						cursor = outlet.until();
 					} else {
-						const Piper::Preamble& preamble(outlet.preamble(cursor));
 						const Piper::Buffer content(outlet.content(cursor));
 						Piper::Source source(content);
 
@@ -341,6 +340,7 @@ int unclog(int argc, char **argv)
 		return 1;
 	}
 }
+
 
 /**
  * Main program.
