@@ -48,29 +48,19 @@ extern "C"
 		}
 	}
 
-	static int piper_prepare(snd_pcm_ioplug_t* ioplug)
+	static int piper_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
 		PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
-		snd_pcm_sw_params_t* params;
 
-		DPRINTF("[DEBUG] preparing device %s\n", ioplug->name);
+		DPRINTF("[DEBUG] checking device parameters%s\n", ioplug->name);
 		DPRINTF("[DEBUG] device %s has a boundary of %lu previously\n", ioplug->name, plugin->boundary);
 
-		if (snd_pcm_sw_params_malloc(&params) < 0) {
-			SNDERR("device %s cannot be prepared: cannot allocate memory for software parameters\n", ioplug->name);
-			return -EBADFD;
-		} else if (snd_pcm_sw_params_current(ioplug->pcm, params) < 0) {
-			SNDERR("device %s cannot be prepared: cannot fetch software parameters\n", ioplug->name);
-			snd_pcm_sw_params_free(params);
-			return -EBADFD;
-		} else if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
+		if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
 			SNDERR("device %s cannot be prepared: cannot fetch boundary from sofware parameters\n", ioplug->name);
-			snd_pcm_sw_params_free(params);
 			return -EBADFD;
 		} else {
 			DPRINTF("[DEBUG] device %s has a boundary of %lu\n", ioplug->name, plugin->boundary);
 			DPRINTF("[DEBUG] device %s is prepared\n", ioplug->name);
-			snd_pcm_sw_params_free(params);
 			return 0;
 		}
 	}
@@ -277,7 +267,7 @@ extern "C"
 			plugin->io.private_data = plugin.get();
 
 			memset(&plugin->callback, 0, sizeof(plugin->callback));
-			plugin->callback.prepare = piper_prepare;
+			plugin->callback.sw_params = piper_sw_params;
 			plugin->callback.start = piper_start;
 			plugin->callback.stop = piper_stop;
 			plugin->callback.pointer = piper_pointer;
