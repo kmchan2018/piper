@@ -21,7 +21,7 @@ namespace Piper
 	/**
 	 * Return the current timestamp.
 	 */
-	Timestamp now()
+	inline Timestamp now()
 	{
 		struct timespec time;
 		::clock_gettime(CLOCK_MONOTONIC, &time);
