@@ -24,7 +24,7 @@
 /**
  * Playback plugin.
  */
-struct PiperPlugin
+struct PiperPlaybackPlugin
 {
 	snd_pcm_ioplug_t io;
 	snd_pcm_ioplug_callback_t callback;
@@ -55,9 +55,9 @@ extern "C"
 	 * Check software parameters of the playback plugin. It fetches the boundary
 	 * parameter so that we can handle pointer wrap around properly.
 	 */
-	static int piper_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
+	static int piper_playback_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
-		PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+		PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 
 		DPRINTF("[DEBUG] checking device parameters%s\n", ioplug->name);
 		DPRINTF("[DEBUG] device %s has a boundary of %lu previously\n", ioplug->name, plugin->boundary);
@@ -76,12 +76,12 @@ extern "C"
 	 * Start the playback in the playback plugin. It starts (or restarts) the
 	 * internal timer that controls buffer consumption.
 	 */
-	static int piper_start(snd_pcm_ioplug_t* ioplug)
+	static int piper_playback_start(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] starting device %s\n", ioplug->name);
 
 		try {
-			PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			plugin->timer->stop();
 			plugin->timer->start();
 			return 0;
@@ -99,12 +99,12 @@ extern "C"
 	 * Stop the playback in the playback plugin. It stops the internal timer
 	 * that controls buffer consumption.
 	 */
-	static int piper_stop(snd_pcm_ioplug_t* ioplug)
+	static int piper_playback_stop(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] stopping device %s\n", ioplug->name);
 
 		try {
-			PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			plugin->timer->stop();
 			return 0;
 
@@ -121,12 +121,12 @@ extern "C"
 	 * Update the hardware pointer of the playback plugin. It checks the timer
 	 * for overdue periods in the buffer and flushes them into the pipe.
 	 */
-	static snd_pcm_sframes_t piper_pointer(snd_pcm_ioplug_t* ioplug)
+	static snd_pcm_sframes_t piper_playback_pointer(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] flusing device %s\n", ioplug->name);
 
 		try {
-			PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			Piper::Inlet* inlet = plugin->inlet.get();
 			Piper::Timer* timer = plugin->timer.get();
 
@@ -167,12 +167,12 @@ extern "C"
 	 * Transfer data into the buffer of the playback plugin. It will copy data
 	 * from the input into the appropriate writable blocks in the pipe.
 	 */
-	static snd_pcm_sframes_t piper_transfer(snd_pcm_ioplug_t* ioplug, const snd_pcm_channel_area_t *input_areas, snd_pcm_uframes_t input_start, snd_pcm_uframes_t input_size)
+	static snd_pcm_sframes_t piper_playback_transfer(snd_pcm_ioplug_t* ioplug, const snd_pcm_channel_area_t *input_areas, snd_pcm_uframes_t input_start, snd_pcm_uframes_t input_size)
 	{
 		DPRINTF("[DEBUG] writing device %s\n", ioplug->name);
 
 		try {
-			PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			Piper::Inlet* inlet = plugin->inlet.get();
 
 			const snd_pcm_uframes_t buffer_capacity = ioplug->buffer_size;
@@ -231,12 +231,12 @@ extern "C"
 	 * Close the playback plugin. It will release any resource associated with
 	 * the plugin.
 	 */
-	static int piper_close(snd_pcm_ioplug_t* ioplug)
+	static int piper_playback_close(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] closing device %s...\n", ioplug->name);
 
 		try {
-			PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			delete plugin;
 			return 0;
 
@@ -253,35 +253,10 @@ extern "C"
 	 * Open the playback device. It will allocate resources for the playback
 	 * plugin as well as configuring it.
 	 */
-	SND_PCM_PLUGIN_DEFINE_FUNC(piper)
+	static int piper_playback_open(snd_pcm_t** pcmp, const char* name, const char* path, snd_pcm_stream_t stream, int mode)
 	{
-		if (stream != SND_PCM_STREAM_PLAYBACK) {
-			SNDERR("device %s cannot be initialized: device supports playback only", name);
-			return -EINVAL;
-		}
-
-		snd_config_iterator_t i, next;
-		const char* path;
-
-		snd_config_for_each(i, next, conf) {
-			snd_config_t* n = snd_config_iterator_entry(i);
-			const char* id;
-
-			if (snd_config_get_id(n, &id) < 0) {
-				continue;
-			} else if (std::strcmp(id, "comment") == 0 || std::strcmp(id, "type") == 0 || std::strcmp(id, "hint") == 0) {
-				continue;
-			} else if (std::strcmp(id, "path") != 0) {
-				SNDERR("device %s cannot be initialized: unknown field %s in config", name, id);
-				return -EINVAL;
-			} else if (snd_config_get_string(n, &path) < 0) {
-				SNDERR("device %s cannot be initialized: invalid path %s in config", name, path);
-				return -EINVAL;
-			}
-		}
-
 		try {
-			std::unique_ptr<PiperPlugin> plugin(new PiperPlugin);
+			std::unique_ptr<PiperPlaybackPlugin> plugin(new PiperPlaybackPlugin);
 
 			plugin->pipe.reset(new Piper::Pipe(path));
 			plugin->inlet.reset(new Piper::Inlet(plugin->pipe.get()));
@@ -297,12 +272,12 @@ extern "C"
 			plugin->io.private_data = plugin.get();
 
 			memset(&plugin->callback, 0, sizeof(plugin->callback));
-			plugin->callback.sw_params = piper_sw_params;
-			plugin->callback.start = piper_start;
-			plugin->callback.stop = piper_stop;
-			plugin->callback.pointer = piper_pointer;
-			plugin->callback.transfer = piper_transfer;
-			plugin->callback.close = piper_close;
+			plugin->callback.sw_params = piper_playback_sw_params;
+			plugin->callback.start = piper_playback_start;
+			plugin->callback.stop = piper_playback_stop;
+			plugin->callback.pointer = piper_playback_pointer;
+			plugin->callback.transfer = piper_playback_transfer;
+			plugin->callback.close = piper_playback_close;
 
 			for (unsigned int i = 0; i < plugin->pipe->channels(); i++) {
 				plugin->areas[i].addr = nullptr;
@@ -357,6 +332,54 @@ extern "C"
 		} catch (...) {
 			SNDERR("device %s cannot be initialized: unknown exception", name);
 			return -EBADFD;
+		}
+	}
+
+	/**
+	 * Open the playback device. It will allocate resources for the plugin as
+	 * well as configuring it.
+	 */
+	SND_PCM_PLUGIN_DEFINE_FUNC(piper)
+	{
+		snd_config_iterator_t i, next;
+		const char* path;
+
+		snd_config_for_each(i, next, conf) {
+			snd_config_t* n = snd_config_iterator_entry(i);
+			const char* id;
+
+			if (snd_config_get_id(n, &id) < 0) {
+				continue;
+			} else if (std::strcmp(id, "comment") == 0 || std::strcmp(id, "type") == 0 || std::strcmp(id, "hint") == 0) {
+				continue;
+			} else if (std::strcmp(id, "playback") == 0) {
+				if (stream != SND_PCM_STREAM_PLAYBACK) {
+					continue;
+				} else if (snd_config_get_string(n, &path) < 0) {
+					SNDERR("device %s cannot be initialized: invalid playback %s in config", name, path);
+					return -EINVAL;
+				}
+			} else if (std::strcmp(id, "capture") == 0) {
+				if (stream != SND_PCM_STREAM_CAPTURE) {
+					continue;
+				} else if (snd_config_get_string(n, &path) < 0) {
+					SNDERR("device %s cannot be initialized: invalid capture %s in config", name, path);
+					return -EINVAL;
+				}
+			} else {
+				SNDERR("device %s cannot be initialized: unknown field %s in config", name, id);
+				return -EINVAL;
+			}
+		}
+
+		if (stream == SND_PCM_STREAM_PLAYBACK) {
+			return piper_playback_open(pcmp, name, path, stream, mode);
+		} else if (stream == SND_PCM_STREAM_CAPTURE) {
+			SNDERR("device %s cannot be initialized: device supports playback only", name);
+			return -EINVAL;
+		} else {
+			SNDERR("device %s cannot be initialized: device supports playback only", name);
+			return -EINVAL;
 		}
 	}
 
