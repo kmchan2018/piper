@@ -76,10 +76,9 @@ namespace Piper
 			}
 
 			if (m_timer.ticks() > 0) {
-				unsigned int increment = m_timer.ticks() * m_fill;
+				unsigned int increment = m_timer.consume() * m_fill;
 				unsigned int limit = m_capacity - m_tokens;
 				m_tokens += std::min(increment, limit);
-				m_timer.clear();
 			}
 		}
 	}

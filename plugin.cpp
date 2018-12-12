@@ -119,8 +119,7 @@ extern "C"
 
 			Piper::Inlet::Position position = inlet->start();
 			unsigned int available = occupied / period;
-			unsigned int outstanding = timer->ticks();
-			timer->clear();
+			unsigned int outstanding = timer->consume();
 
 			if (outstanding > available) {
 				SNDERR("device %s cannot be flushed: insufficient data to flush\n", ioplug->name);
