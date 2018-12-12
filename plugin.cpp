@@ -22,7 +22,7 @@
 
 
 /**
- * Plugin data.
+ * Playback plugin.
  */
 struct PiperPlugin
 {
@@ -39,6 +39,9 @@ struct PiperPlugin
 extern "C"
 {
 
+	/**
+	 * Calculate the difference between 2 pointers with wrap around.
+	 */
 	static snd_pcm_uframes_t difference(snd_pcm_uframes_t start, snd_pcm_uframes_t end, snd_pcm_uframes_t wraparound)
 	{
 		if (start <= end) {
@@ -48,6 +51,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Check software parameters of the playback plugin. It fetches the boundary
+	 * parameter so that we can handle pointer wrap around properly.
+	 */
 	static int piper_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
 		PiperPlugin* plugin = static_cast<PiperPlugin*>(ioplug->private_data);
@@ -65,6 +72,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Start the playback in the playback plugin. It starts (or restarts) the
+	 * internal timer that controls buffer consumption.
+	 */
 	static int piper_start(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] starting device %s\n", ioplug->name);
@@ -84,6 +95,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Stop the playback in the playback plugin. It stops the internal timer
+	 * that controls buffer consumption.
+	 */
 	static int piper_stop(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] stopping device %s\n", ioplug->name);
@@ -102,6 +117,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Update the hardware pointer of the playback plugin. It checks the timer
+	 * for overdue periods in the buffer and flushes them into the pipe.
+	 */
 	static snd_pcm_sframes_t piper_pointer(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] flusing device %s\n", ioplug->name);
@@ -144,6 +163,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Transfer data into the buffer of the playback plugin. It will copy data
+	 * from the input into the appropriate writable blocks in the pipe.
+	 */
 	static snd_pcm_sframes_t piper_transfer(snd_pcm_ioplug_t* ioplug, const snd_pcm_channel_area_t *input_areas, snd_pcm_uframes_t input_start, snd_pcm_uframes_t input_size)
 	{
 		DPRINTF("[DEBUG] writing device %s\n", ioplug->name);
@@ -204,6 +227,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Close the playback plugin. It will release any resource associated with
+	 * the plugin.
+	 */
 	static int piper_close(snd_pcm_ioplug_t* ioplug)
 	{
 		DPRINTF("[DEBUG] closing device %s...\n", ioplug->name);
@@ -222,6 +249,10 @@ extern "C"
 		}
 	}
 
+	/**
+	 * Open the playback device. It will allocate resources for the playback
+	 * plugin as well as configuring it.
+	 */
 	SND_PCM_PLUGIN_DEFINE_FUNC(piper)
 	{
 		if (stream != SND_PCM_STREAM_PLAYBACK) {
