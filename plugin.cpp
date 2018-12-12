@@ -29,6 +29,7 @@ struct PiperPlaybackPlugin
 	snd_pcm_ioplug_t io;
 	snd_pcm_ioplug_callback_t callback;
 	snd_pcm_uframes_t boundary;
+	std::string name;
 	std::vector<snd_pcm_channel_area_t> areas;
 	std::unique_ptr<Piper::Timer> timer;
 	std::unique_ptr<Piper::Pipe> pipe;
@@ -44,6 +45,7 @@ struct PiperCapturePlugin
 	snd_pcm_ioplug_callback_t callback;
 	snd_pcm_uframes_t boundary;
 	Piper::Inlet::Position cursor;
+	std::string name;
 	std::vector<snd_pcm_channel_area_t> areas;
 	std::unique_ptr<Piper::Timer> timer;
 	std::unique_ptr<Piper::Pipe> pipe;
@@ -66,23 +68,30 @@ extern "C"
 	}
 
 	/**
-	 * Check software parameters of the playback plugin. It fetches the boundary
+	 * Query software parameters of the playback plugin. It fetches the boundary
 	 * parameter so that we can handle pointer wrap around properly.
 	 */
 	static int piper_playback_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
-		PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
+		DPRINTF("[DEBUG] querying software parameters for device %s\n", ioplug->name);
 
-		DPRINTF("[DEBUG] checking device parameters%s\n", ioplug->name);
-		DPRINTF("[DEBUG] device %s has a boundary of %lu previously\n", ioplug->name, plugin->boundary);
+		try {
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 
-		if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
-			SNDERR("device %s cannot be prepared: cannot fetch boundary from sofware parameters\n", ioplug->name);
-			return -EBADFD;
-		} else {
+			if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
+				SNDERR("device %s cannot be prepared: cannot fetch boundary from sofware parameters\n", ioplug->name);
+				return -EBADFD;
+			}
+
 			DPRINTF("[DEBUG] device %s has a boundary of %lu\n", ioplug->name, plugin->boundary);
-			DPRINTF("[DEBUG] device %s is prepared\n", ioplug->name);
 			return 0;
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be queried: %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be queried: unknown exception\n", ioplug->name);
+			return -EBADFD;
 		}
 	}
 
@@ -133,11 +142,11 @@ extern "C"
 
 	/**
 	 * Update the hardware pointer of the playback plugin. It checks the timer
-	 * for overdue periods in the buffer and flushes them into the pipe.
+	 * for overdue periods in the buffer and drains them into the pipe.
 	 */
 	static snd_pcm_sframes_t piper_playback_pointer(snd_pcm_ioplug_t* ioplug)
 	{
-		DPRINTF("[DEBUG] flusing device %s\n", ioplug->name);
+		DPRINTF("[DEBUG] draining device %s\n", ioplug->name);
 
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
@@ -155,7 +164,7 @@ extern "C"
 			unsigned int outstanding = timer->consume();
 
 			if (outstanding > available) {
-				SNDERR("device %s cannot be flushed: insufficient data to flush\n", ioplug->name);
+				SNDERR("device %s cannot be drained: insufficient data to flush\n", ioplug->name);
 				return -EPIPE;
 			}
 
@@ -169,10 +178,10 @@ extern "C"
 			return (start + copied) % capacity;
 
 		} catch (std::exception& ex) {
-			SNDERR("device %s cannot be flushed: %s\n", ioplug->name, ex.what());
+			SNDERR("device %s cannot be drained: %s\n", ioplug->name, ex.what());
 			return -EBADFD;
 		} catch (...) {
-			SNDERR("device %s cannot be flushed: unknown exception\n", ioplug->name);
+			SNDERR("device %s cannot be drained: unknown exception\n", ioplug->name);
 			return -EBADFD;
 		}
 	}
@@ -189,18 +198,17 @@ extern "C"
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			Piper::Inlet* inlet = plugin->inlet.get();
 
-			const snd_pcm_uframes_t buffer_capacity = ioplug->buffer_size;
-			const snd_pcm_uframes_t buffer_occupied = difference(ioplug->hw_ptr, ioplug->appl_ptr, plugin->boundary);
-			const snd_pcm_uframes_t buffer_unoccupied = buffer_capacity - buffer_occupied;
-
-			if (input_size > buffer_unoccupied) {
-				SNDERR("device %s cannot be written: insufficient space (%lu) for incoming data (%lu)", buffer_occupied, input_size);
-				input_size = buffer_unoccupied;
-			}
-
 			const unsigned int channels = ioplug->channels;
 			const snd_pcm_format_t format = ioplug->format;
+			const snd_pcm_uframes_t buffer_capacity = ioplug->buffer_size;
+			const snd_pcm_uframes_t buffer_occupied = difference(ioplug->hw_ptr, ioplug->appl_ptr, plugin->boundary);
+			const snd_pcm_uframes_t buffer_writable = buffer_capacity - buffer_occupied;
 			const snd_pcm_uframes_t target_capacity = ioplug->period_size;
+
+			if (input_size > buffer_writable) {
+				SNDERR("device %s cannot be written: insufficient space (%lu) for incoming data (%lu)", buffer_occupied, input_size);
+				input_size = buffer_writable;
+			}
 
 			Piper::Inlet::Position target_position = inlet->start() + (buffer_occupied / target_capacity);
 			snd_pcm_channel_area_t* target_areas = plugin->areas.data();
@@ -233,10 +241,10 @@ extern "C"
 			return static_cast<snd_pcm_sframes_t>(copied);
 
 		} catch (std::exception& ex) {
-			SNDERR("device %s cannot be flushed: %s\n", ioplug->name, ex.what());
+			SNDERR("device %s cannot be written: %s\n", ioplug->name, ex.what());
 			return -EBADFD;
 		} catch (...) {
-			SNDERR("device %s cannot be flushed: unknown exception\n", ioplug->name);
+			SNDERR("device %s cannot be written: unknown exception\n", ioplug->name);
 			return -EBADFD;
 		}
 	}
@@ -247,7 +255,7 @@ extern "C"
 	 */
 	static int piper_playback_close(snd_pcm_ioplug_t* ioplug)
 	{
-		DPRINTF("[DEBUG] closing device %s...\n", ioplug->name);
+		DPRINTF("[DEBUG] closing device %s\n", ioplug->name);
 
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
@@ -277,8 +285,11 @@ extern "C"
 			plugin->timer.reset(new Piper::Timer(plugin->pipe->period_time()));
 			plugin->areas.resize(plugin->pipe->channels());
 
+			plugin->name = name;
+			plugin->boundary = 0;
+
 			plugin->io.version = SND_PCM_IOPLUG_VERSION;
-			plugin->io.name = "ALSA <-> Piper PCM I/O Plugin";
+			plugin->io.name = plugin->name.data();
 			plugin->io.poll_fd = plugin->timer->descriptor();
 			plugin->io.poll_events = POLLIN;
 			plugin->io.mmap_rw = 0;
@@ -304,7 +315,6 @@ extern "C"
 			unsigned int channels = static_cast<unsigned int>(plugin->pipe->channels());
 			unsigned int rate = static_cast<unsigned int>(plugin->pipe->rate());
 			unsigned int period = static_cast<unsigned int>(plugin->pipe->period_size());
-			unsigned int buffers = static_cast<unsigned int>(plugin->pipe->buffer());
 			int err = 0;
 
 			if ((err = snd_pcm_ioplug_create(&plugin->io, name, stream, mode)) < 0) {
@@ -330,7 +340,7 @@ extern "C"
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_PERIOD_BYTES", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_minmax(&plugin->io, SND_PCM_IOPLUG_HW_PERIODS, 2, buffers)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_minmax(&plugin->io, SND_PCM_IOPLUG_HW_PERIODS, 2, plugin->inlet->window())) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_PERIODS", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
@@ -355,17 +365,25 @@ extern "C"
 	 */
 	static int piper_capture_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
-		PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
+		DPRINTF("[DEBUG] querying software parameters for device %s\n", ioplug->name);
 
-		DPRINTF("[DEBUG] checking device parameters %s\n", ioplug->name);
-		DPRINTF("[DEBUG] device %s has a boundary of %lu previously\n", ioplug->name, plugin->boundary);
+		try {
+			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
 
-		if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
-			SNDERR("device %s cannot be prepared: cannot fetch boundary from sofware parameters\n", ioplug->name);
-			return -EBADFD;
-		} else {
+			if (snd_pcm_sw_params_get_boundary(params, &plugin->boundary) < 0) {
+				SNDERR("device %s cannot be prepared: cannot fetch boundary from sofware parameters\n", ioplug->name);
+				return -EBADFD;
+			}
+
 			DPRINTF("[DEBUG] device %s has a boundary of %lu\n", ioplug->name, plugin->boundary);
 			return 0;
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be queried: %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be queried: unknown exception\n", ioplug->name);
+			return -EBADFD;
 		}
 	}
 
@@ -470,17 +488,15 @@ extern "C"
 			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
 			Piper::Outlet* outlet = plugin->outlet.get();
 
-			const snd_pcm_uframes_t buffer_capacity = ioplug->buffer_size;
+			const unsigned int channels = ioplug->channels;
+			const snd_pcm_format_t format = ioplug->format;
 			const snd_pcm_uframes_t buffer_readable = difference(ioplug->appl_ptr, ioplug->hw_ptr, plugin->boundary);
+			const snd_pcm_uframes_t source_capacity = ioplug->period_size;
 
 			if (output_size > buffer_readable) {
 				SNDERR("device %s cannot be read: insufficient data (%lu) than requested (%lu)", buffer_readable, output_size);
 				output_size = buffer_readable;
 			}
-
-			const unsigned int channels = ioplug->channels;
-			const snd_pcm_format_t format = ioplug->format;
-			const snd_pcm_uframes_t source_capacity = ioplug->period_size;
 
 			Piper::Inlet::Position source_position = outlet->until() - (buffer_readable / source_capacity) - (buffer_readable % source_capacity > 0 ? 1 : 0);
 			snd_pcm_channel_area_t* source_areas = plugin->areas.data();
@@ -497,7 +513,7 @@ extern "C"
 				}
 
 				if ((err = snd_pcm_areas_copy(output_areas, output_start, source_areas, source_start, channels, source_size, format)) < 0) {
-					SNDERR("device %s cannot be written: copy error", ioplug->name);
+					SNDERR("device %s cannot be read: copy error", ioplug->name);
 					return err;
 				}
 
@@ -513,10 +529,10 @@ extern "C"
 			return static_cast<snd_pcm_sframes_t>(copied);
 
 		} catch (std::exception& ex) {
-			SNDERR("device %s cannot be flushed: %s\n", ioplug->name, ex.what());
+			SNDERR("device %s cannot be read: %s\n", ioplug->name, ex.what());
 			return -EBADFD;
 		} catch (...) {
-			SNDERR("device %s cannot be flushed: unknown exception\n", ioplug->name);
+			SNDERR("device %s cannot be read: unknown exception\n", ioplug->name);
 			return -EBADFD;
 		}
 	}
@@ -557,10 +573,12 @@ extern "C"
 			plugin->timer.reset(new Piper::Timer(plugin->pipe->period_time()));
 			plugin->areas.resize(plugin->pipe->channels());
 
+			plugin->name = name;
 			plugin->cursor = plugin->outlet->until();
+			plugin->boundary = 0;
 
 			plugin->io.version = SND_PCM_IOPLUG_VERSION;
-			plugin->io.name = "ALSA <-> Piper PCM I/O Plugin";
+			plugin->io.name = plugin->name.data();
 			plugin->io.poll_fd = plugin->timer->descriptor();
 			plugin->io.poll_events = POLLIN;
 			plugin->io.mmap_rw = 0;
