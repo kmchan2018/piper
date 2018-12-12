@@ -3,3 +3,10 @@
 libasound_module_pcm_piper.so
 piper
 
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+config.h
+install_manifest.txt
+
