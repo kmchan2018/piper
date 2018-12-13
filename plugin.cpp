@@ -96,6 +96,29 @@ extern "C"
 	}
 
 	/**
+	 * Prepare the playback in the playback plugin. It starts the internal
+	 * timer that controls the buffer consumption.
+	 */
+	static int piper_playback_prepare(snd_pcm_ioplug_t* ioplug)
+	{
+		DPRINTF("[DEBUG] preparing device %s\n", ioplug->name);
+
+		try {
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
+			plugin->timer->stop();
+			plugin->timer->start();
+			return 0;
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be started: %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be started: unknown exception\n", ioplug->name);
+			return -EBADFD;
+		}
+	}
+
+	/**
 	 * Start the playback in the playback plugin. It starts (or restarts) the
 	 * internal timer that controls buffer consumption.
 	 */
@@ -129,6 +152,7 @@ extern "C"
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			plugin->timer->stop();
+			plugin->timer->start();
 			return 0;
 
 		} catch (std::exception& ex) {
@@ -137,6 +161,31 @@ extern "C"
 		} catch (...) {
 			SNDERR("device %s cannot be stopped due to unknown exception\n", ioplug->name);
 			return -EBADFD;
+		}
+	}
+
+	/**
+	 * Demangle the poll result. Application monitors the timer descriptor
+	 * for write opportunities, but that descriptor can only be polled for
+	 * read opportunities. This callback patches the poll result.
+	 * .
+	 */
+	static int piper_playback_poll_revents(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short *revents)
+	{
+		DPRINTF("[DEBUG] poll_revents callback invoked for device %s\n", ioplug->name);
+
+		if (nfds == 0) {
+			*revents = 0;
+			return 0;
+		} else if ((pfd[0].revents & POLLIN) > 0) {
+			*revents = (pfd[0].revents & ~POLLIN) | POLLOUT;
+			DPRINTF("[DEBUG] Replacing POLLIN (%d) with POLLOUT (%d) from poll result\n", POLLIN, POLLOUT);
+			DPRINTF("[DEBUG]   original revents: %d\n", pfd[0].revents);
+			DPRINTF("[DEBUG]   patched revents: %d\n", *revents);
+			return 0;
+		} else {
+			*revents = pfd[0].revents;
+			return 0;
 		}
 	}
 
@@ -298,8 +347,10 @@ extern "C"
 
 			memset(&plugin->callback, 0, sizeof(plugin->callback));
 			plugin->callback.sw_params = piper_playback_sw_params;
+			plugin->callback.prepare = piper_playback_prepare;
 			plugin->callback.start = piper_playback_start;
 			plugin->callback.stop = piper_playback_stop;
+			plugin->callback.poll_revents = piper_playback_poll_revents;
 			plugin->callback.pointer = piper_playback_pointer;
 			plugin->callback.transfer = piper_playback_transfer;
 			plugin->callback.close = piper_playback_close;
