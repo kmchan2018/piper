@@ -18,8 +18,8 @@
 #include "timer.hpp"
 
 
-//#define DPRINTF(s, ...) fprintf(stderr, (s), __VA_ARGS__)
-#define DPRINTF(s, ...)
+#define DPRINTF(s, ...) fprintf(stderr, (s), __VA_ARGS__)
+//#define DPRINTF(s, ...)
 
 
 /**
@@ -49,9 +49,10 @@ struct PiperCapturePlugin
 	Piper::Inlet::Position cursor;
 	std::string name;
 	std::vector<snd_pcm_channel_area_t> areas;
-	std::unique_ptr<Piper::Timer> timer;
 	std::unique_ptr<Piper::Pipe> pipe;
 	std::unique_ptr<Piper::Outlet> outlet;
+	std::unique_ptr<Piper::Timer> timer;
+	std::unique_ptr<Piper::SignPost> signpost;
 };
 
 extern "C"
@@ -493,6 +494,25 @@ extern "C"
 	}
 
 	/**
+	 * Prepare the capture plugin. It signals that the device is readable.
+	 */
+	static int piper_capture_prepare(snd_pcm_ioplug_t* ioplug)
+	{
+		try {
+			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
+			plugin->signpost->deactivate();
+			return 0;
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be started: %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be started: unknown exception\n", ioplug->name);
+			return -EBADFD;
+		}
+	}
+
+	/**
 	 * Start the capture in the capture plugin. It starts (or restarts) the
 	 * internal timer that controls buffer supplement.
 	 */
@@ -504,6 +524,7 @@ extern "C"
 			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
 			plugin->timer->stop();
 			plugin->timer->start();
+			plugin->signpost->deactivate();
 			plugin->cursor = plugin->outlet->until();
 			return 0;
 
@@ -527,6 +548,7 @@ extern "C"
 		try {
 			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
 			plugin->timer->stop();
+			plugin->signpost->deactivate();
 			return 0;
 
 		} catch (std::exception& ex) {
@@ -536,6 +558,61 @@ extern "C"
 			SNDERR("device %s cannot be stopped due to unknown exception\n", ioplug->name);
 			return -EBADFD;
 		}
+	}
+
+	/**
+	 * Return the number of descriptors that should be monitored.
+	 */
+	static int piper_capture_poll_descriptors_count(snd_pcm_ioplug_t* ioplug)
+	{
+		return 2;
+	}
+
+	/**
+	 * Return the descriptors that should be monitored.
+	 */
+	static int piper_capture_poll_descriptors(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int space)
+	{
+		try {
+			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
+
+			if (space >= 2) {
+				pfd[0].fd = plugin->timer->descriptor();
+				pfd[0].events = POLLIN;
+				pfd[0].revents = 0;
+				pfd[1].fd = plugin->signpost->descriptor();
+				pfd[1].events = POLLIN;
+				pfd[1].revents = 0;
+				return 2;
+			} else {
+				return -EINVAL;
+			}
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be stopped due to %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be stopped due to unknown exception\n", ioplug->name);
+			return -EBADFD;
+		}
+	}
+
+	/**
+	 * Demangle the poll result. Application monitors the timer descriptor
+	 * for read opportunities, but that descriptor can only be polled for
+	 * read opportunities. This callback patches the poll result.
+	 * .
+	 */
+	static int piper_capture_poll_revents(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
+	{
+		for (unsigned int i = 0; i < nfds; i++) {
+			if (pfd[i].revents != 0) {
+				*revents = pfd[i].revents;
+				return 0;
+			}
+		}
+
+		return 0;
 	}
 
 	/**
@@ -550,6 +627,7 @@ extern "C"
 			PiperCapturePlugin* plugin = static_cast<PiperCapturePlugin*>(ioplug->private_data);
 			Piper::Outlet* outlet = plugin->outlet.get();
 			Piper::Timer* timer = plugin->timer.get();
+			Piper::SignPost* signpost = plugin->signpost.get();
 
 			const snd_pcm_uframes_t capacity = ioplug->buffer_size;
 			const snd_pcm_uframes_t period = ioplug->period_size;
@@ -566,12 +644,16 @@ extern "C"
 				SNDERR("device %s cannot be filled: insufficient space to fill\n", ioplug->name);
 				return -EPIPE;
 			} else if (incoming > 0) {
+				signpost->activate();
 				plugin->cursor = until;
 				return (ioplug->hw_ptr + incoming) % capacity;
+			} else if (readable > 0) {
+				signpost->activate();
+				return ioplug->hw_ptr % capacity;
 			} else {
+				signpost->deactivate();
 				return ioplug->hw_ptr % capacity;
 			}
-
 		} catch (std::exception& ex) {
 			SNDERR("device %s cannot be filled: %s\n", ioplug->name, ex.what());
 			return -EBADFD;
@@ -631,6 +713,12 @@ extern "C"
 				source_size = std::min(output_size, source_capacity);
 			}
 
+			if (copied == buffer_readable) {
+				plugin->signpost->deactivate();
+			} else {
+				plugin->signpost->activate();
+			}
+
 			return static_cast<snd_pcm_sframes_t>(copied);
 
 		} catch (std::exception& ex) {
@@ -676,6 +764,7 @@ extern "C"
 			plugin->pipe.reset(new Piper::Pipe(path));
 			plugin->outlet.reset(new Piper::Outlet(plugin->pipe.get()));
 			plugin->timer.reset(new Piper::Timer(plugin->pipe->period_time()));
+			plugin->signpost.reset(new Piper::SignPost());
 			plugin->areas.resize(plugin->pipe->channels());
 
 			plugin->name = name;
@@ -692,8 +781,12 @@ extern "C"
 
 			memset(&plugin->callback, 0, sizeof(plugin->callback));
 			plugin->callback.sw_params = piper_capture_sw_params;
+			plugin->callback.prepare = piper_capture_prepare;
 			plugin->callback.start = piper_capture_start;
 			plugin->callback.stop = piper_capture_stop;
+			plugin->callback.poll_descriptors_count = piper_capture_poll_descriptors_count;
+			plugin->callback.poll_descriptors = piper_capture_poll_descriptors;
+			plugin->callback.poll_revents = piper_capture_poll_revents;
 			plugin->callback.pointer = piper_capture_pointer;
 			plugin->callback.transfer = piper_capture_transfer;
 			plugin->callback.close = piper_capture_close;
