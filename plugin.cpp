@@ -14,6 +14,7 @@
 #include "exception.hpp"
 #include "timestamp.hpp"
 #include "pipe.hpp"
+#include "signpost.hpp"
 #include "timer.hpp"
 
 
@@ -31,9 +32,10 @@ struct PiperPlaybackPlugin
 	snd_pcm_uframes_t boundary;
 	std::string name;
 	std::vector<snd_pcm_channel_area_t> areas;
-	std::unique_ptr<Piper::Timer> timer;
 	std::unique_ptr<Piper::Pipe> pipe;
 	std::unique_ptr<Piper::Inlet> inlet;
+	std::unique_ptr<Piper::Timer> timer;
+	std::unique_ptr<Piper::SignPost> signpost;
 };
 
 /**
@@ -106,7 +108,7 @@ extern "C"
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			plugin->timer->stop();
-			plugin->timer->start();
+			plugin->signpost->activate();
 			return 0;
 
 		} catch (std::exception& ex) {
@@ -152,8 +154,45 @@ extern "C"
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			plugin->timer->stop();
-			plugin->timer->start();
+			plugin->signpost->deactivate();
 			return 0;
+
+		} catch (std::exception& ex) {
+			SNDERR("device %s cannot be stopped due to %s\n", ioplug->name, ex.what());
+			return -EBADFD;
+		} catch (...) {
+			SNDERR("device %s cannot be stopped due to unknown exception\n", ioplug->name);
+			return -EBADFD;
+		}
+	}
+
+	/**
+	 * Return the number of descriptors that should be monitored.
+	 */
+	static int piper_playback_poll_descriptors_count(snd_pcm_ioplug_t* ioplug)
+	{
+		return 2;
+	}
+
+	/**
+	 * Return the descriptors that should be monitored.
+	 */
+	static int piper_playback_poll_descriptors(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int space)
+	{
+		try {
+			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
+
+			if (space >= 2) {
+				pfd[0].fd = plugin->timer->descriptor();
+				pfd[0].events = POLLIN;
+				pfd[0].revents = 0;
+				pfd[1].fd = plugin->signpost->descriptor();
+				pfd[1].events = POLLIN;
+				pfd[1].revents = 0;
+				return 2;
+			} else {
+				return -EINVAL;
+			}
 
 		} catch (std::exception& ex) {
 			SNDERR("device %s cannot be stopped due to %s\n", ioplug->name, ex.what());
@@ -170,23 +209,21 @@ extern "C"
 	 * read opportunities. This callback patches the poll result.
 	 * .
 	 */
-	static int piper_playback_poll_revents(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short *revents)
+	static int piper_playback_poll_revents(snd_pcm_ioplug_t* ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 	{
-		DPRINTF("[DEBUG] poll_revents callback invoked for device %s\n", ioplug->name);
+		for (unsigned int i = 0; i < nfds; i++) {
+			unsigned short temp = pfd[i].revents;
 
-		if (nfds == 0) {
-			*revents = 0;
-			return 0;
-		} else if ((pfd[0].revents & POLLIN) > 0) {
-			*revents = (pfd[0].revents & ~POLLIN) | POLLOUT;
-			DPRINTF("[DEBUG] Replacing POLLIN (%d) with POLLOUT (%d) from poll result\n", POLLIN, POLLOUT);
-			DPRINTF("[DEBUG]   original revents: %d\n", pfd[0].revents);
-			DPRINTF("[DEBUG]   patched revents: %d\n", *revents);
-			return 0;
-		} else {
-			*revents = pfd[0].revents;
-			return 0;
+			if (temp != 0 && (temp & POLLIN) != 0) {
+				*revents = (temp & ~POLLIN) | POLLOUT;
+				return 0;
+			} else if (temp != 0) {
+				*revents = temp;
+				return 0;
+			}
 		}
+
+		return 0;
 	}
 
 	/**
@@ -201,6 +238,7 @@ extern "C"
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			Piper::Inlet* inlet = plugin->inlet.get();
 			Piper::Timer* timer = plugin->timer.get();
+			Piper::SignPost* signpost = plugin->signpost.get();
 
 			const snd_pcm_uframes_t capacity = ioplug->buffer_size;
 			const snd_pcm_uframes_t period = ioplug->period_size;
@@ -214,12 +252,18 @@ extern "C"
 
 			if (outstanding > available) {
 				SNDERR("device %s cannot be drained: insufficient data to flush\n", ioplug->name);
+				timer->stop();
+				signpost->deactivate();
 				return -EPIPE;
 			}
 
 			for (unsigned int i = 0; i < outstanding; i++) {
 				inlet->preamble(position++).timestamp = Piper::now();
 				inlet->flush();
+			}
+
+			if (outstanding > 0) {
+				signpost->activate();
 			}
 
 			snd_pcm_uframes_t start = ioplug->hw_ptr % capacity;
@@ -246,6 +290,7 @@ extern "C"
 		try {
 			PiperPlaybackPlugin* plugin = static_cast<PiperPlaybackPlugin*>(ioplug->private_data);
 			Piper::Inlet* inlet = plugin->inlet.get();
+			Piper::SignPost* signpost = plugin->signpost.get();
 
 			const unsigned int channels = ioplug->channels;
 			const snd_pcm_format_t format = ioplug->format;
@@ -285,6 +330,12 @@ extern "C"
 				target_position += 1;
 				target_start = 0;
 				target_size = std::min(input_size, target_capacity);
+			}
+
+			if (copied == buffer_writable) {
+				signpost->deactivate();
+			} else {
+				signpost->activate();
 			}
 
 			return static_cast<snd_pcm_sframes_t>(copied);
@@ -332,6 +383,7 @@ extern "C"
 			plugin->pipe.reset(new Piper::Pipe(path));
 			plugin->inlet.reset(new Piper::Inlet(plugin->pipe.get()));
 			plugin->timer.reset(new Piper::Timer(plugin->pipe->period_time()));
+			plugin->signpost.reset(new Piper::SignPost());
 			plugin->areas.resize(plugin->pipe->channels());
 
 			plugin->name = name;
@@ -350,6 +402,8 @@ extern "C"
 			plugin->callback.prepare = piper_playback_prepare;
 			plugin->callback.start = piper_playback_start;
 			plugin->callback.stop = piper_playback_stop;
+			plugin->callback.poll_descriptors_count = piper_playback_poll_descriptors_count;
+			plugin->callback.poll_descriptors = piper_playback_poll_descriptors;
 			plugin->callback.poll_revents = piper_playback_poll_revents;
 			plugin->callback.pointer = piper_playback_pointer;
 			plugin->callback.transfer = piper_playback_transfer;

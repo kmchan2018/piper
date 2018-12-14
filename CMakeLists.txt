@@ -12,6 +12,7 @@ set (
 	CORE_SOURCES
 	file.cpp
 	pipe.cpp
+	signpost.cpp
 	timer.cpp
 	tokenbucket.cpp
 	transport.cpp
