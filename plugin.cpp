@@ -815,7 +815,7 @@ extern "C"
 			const snd_pcm_uframes_t readable_blocks = readable / period;
 			const snd_pcm_uframes_t readable_leftovers = readable % period;
 
-			Piper::Inlet::Position source_position = plugin->outlet->until() - readable_blocks - (readable_leftovers > 0 ? 1 : 0);
+			Piper::Inlet::Position source_position = plugin->cursor - readable_blocks - (readable_leftovers > 0 ? 1 : 0);
 			snd_pcm_channel_area_t* source_areas = plugin->areas.data();
 			snd_pcm_uframes_t source_start = (readable_leftovers > 0 ? period - readable_leftovers : 0);
 			snd_pcm_uframes_t source_size = (readable_leftovers > 0 ? readable_leftovers : period);
