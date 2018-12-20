@@ -139,9 +139,14 @@ namespace Piper
 		private:
 
 			/**
+			 * Transport version.
+			 */
+			static const std::uint32_t VERSION = 1;
+
+			/**
 			 * Component Limit.
 			 */
-			static const unsigned int MAX_COMPONENT_COUNT = 16;
+			static const unsigned int MAX_COMPONENT_COUNT = 15;
 
 			/**
 			 * Channel header contains common properties of the pipe and is stored
@@ -173,8 +178,10 @@ namespace Piper
 			 */
 			struct Header
 			{
+				std::uint32_t version = VERSION;
 				std::uint32_t slot_count;
 				std::uint32_t component_count;
+				std::uint32_t page_size;
 				std::uint32_t metadata_size;
 				std::uint32_t component_sizes[MAX_COMPONENT_COUNT];
 				WriteCounter writes;
@@ -183,11 +190,21 @@ namespace Piper
 
 				static_assert(sizeof(unsigned int) >= sizeof(std::uint32_t), "possible precision loss");
 				static_assert(sizeof(std::size_t) >= sizeof(std::uint32_t), "possible precision loss");
-
-				static_assert(sizeof(WriteCounter) == sizeof(Position), "layout difference");
-				static_assert(sizeof(TicketCounter) == sizeof(Session), "layout difference");
-				static_assert(sizeof(SessionMarker) == sizeof(Session), "layout difference");
 			};
+
+			static_assert(sizeof(WriteCounter) == sizeof(Position), "incorrect layout for transport header");
+			static_assert(sizeof(TicketCounter) == sizeof(Session), "incorrect layout for transport header");
+			static_assert(sizeof(SessionMarker) == sizeof(Session), "incorrect layout for transport header");
+
+			static_assert(offsetof(Header, slot_count) - offsetof(Header, version) == sizeof(Header::version), "incorrect layout for transport header");
+			static_assert(offsetof(Header, component_count) - offsetof(Header, slot_count) == sizeof(Header::slot_count), "incorrect layout for transport header");
+			static_assert(offsetof(Header, page_size) - offsetof(Header, component_count) == sizeof(Header::component_count), "incorrect layout for transport header");
+			static_assert(offsetof(Header, metadata_size) - offsetof(Header, page_size) == sizeof(Header::page_size), "incorrect layout for transport header");
+			static_assert(offsetof(Header, component_sizes) - offsetof(Header, metadata_size) == sizeof(Header::metadata_size), "incorrect layout for transport header");
+			static_assert(offsetof(Header, writes) - offsetof(Header, component_sizes) == sizeof(Header::component_sizes), "incorrect layout for transport header");
+			static_assert(offsetof(Header, tickets) - offsetof(Header, writes) == sizeof(Header::tickets), "incorrect layout for transport header");
+			static_assert(offsetof(Header, session) - offsetof(Header, tickets) == sizeof(Header::session), "incorrect layout for transport header");
+			static_assert(sizeof(Header) - offsetof(Header, session) == sizeof(Header::session), "incorrect layout for transport header");
 
 			std::string m_path;
 			File m_file;

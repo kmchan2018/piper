@@ -60,15 +60,14 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	inline Pipe::Metadata::Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation) :
+	inline Pipe::Metadata::Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable) :
 		m_channels(channels),
 		m_rate(rate),
 		m_frame_size(0),
 		m_period_size(0),
 		m_period_time(period),
 		m_readable(readable),
-		m_writable(writable),
-		m_capacity(readable + writable + separation)
+		m_writable(writable)
 	{
 		std::size_t size = std::strlen(format);
 		snd_pcm_format_t code = snd_pcm_format_value(format);
@@ -107,12 +106,13 @@ namespace Piper
 		m_period_size(0),
 		m_period_time(metadata.m_period_time),
 		m_readable(metadata.m_readable),
-		m_writable(metadata.m_writable),
-		m_capacity(metadata.m_capacity)
+		m_writable(metadata.m_writable)
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
 
-		if (metadata.m_format[MAX_FORMAT_SIZE - 1] != 0) {
+		if (metadata.m_version != VERSION) {
+			throw InvalidArgumentException("invalid version", "pipe.cpp", __LINE__);
+		} else if (metadata.m_format[MAX_FORMAT_SIZE - 1] != 0) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
@@ -126,8 +126,6 @@ namespace Piper
 			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
 		} else if (m_writable <= 1) {
 			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
-		} else if (m_capacity < m_readable + m_writable) {
-			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
 			std::memset(m_format, 0, MAX_FORMAT_SIZE);
 			std::memcpy(m_format, metadata.m_format, MAX_FORMAT_SIZE - 1);
@@ -141,7 +139,9 @@ namespace Piper
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
 
-		if (metadata.m_format[MAX_FORMAT_SIZE - 1] != 0) {
+		if (metadata.m_version != VERSION) {
+			throw InvalidArgumentException("invalid version", "pipe.cpp", __LINE__);
+		} else if (metadata.m_format[MAX_FORMAT_SIZE - 1] != 0) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
@@ -155,8 +155,6 @@ namespace Piper
 			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
 		} else if (metadata.m_writable <= 1) {
 			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
-		} else if (metadata.m_capacity < metadata.m_readable + metadata.m_writable) {
-			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
 			std::memset(m_format, 0, MAX_FORMAT_SIZE);
 			std::memcpy(m_format, metadata.m_format, MAX_FORMAT_SIZE - 1);
@@ -168,7 +166,6 @@ namespace Piper
 			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
 			m_readable = metadata.m_readable;
 			m_writable = metadata.m_writable;
-			m_capacity = metadata.m_capacity;
 
 			return *this;
 		}
@@ -181,8 +178,8 @@ namespace Piper
 	//////////////////////////////////////////////////////////////////////////
 
 	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, int mode) :
-		m_metadata(format, channels, rate, period, readable, writable, separation),
-		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, m_metadata.m_capacity, mode),
+		m_metadata(format, channels, rate, period, readable, writable),
+		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, readable + writable + separation, mode),
 		m_medium(m_backer),
 		m_transport(m_medium)
 	{
@@ -204,7 +201,9 @@ namespace Piper
 		} else {
 			const Metadata& temp = m_transport.metadata().to_struct_reference<Metadata>();
 		
-			if (temp.m_period_size != m_backer.component_size(1)) {
+			if (temp.m_readable + temp.m_writable > m_backer.slot_count()) {
+				throw InvalidArgumentException("invalid pipe file", "pipe.cpp", __LINE__);
+			} else if (temp.m_period_size != m_backer.component_size(1)) {
 				throw InvalidArgumentException("invalid pipe file", "pipe.cpp", __LINE__);
 			} else {
 				m_metadata = temp;

@@ -154,17 +154,17 @@ namespace Piper
 			/**
 			 * Return the capacity of the pipe in term of period.
 			 */
-			unsigned int capacity() const noexcept { return m_metadata.m_capacity; }
+			unsigned int capacity() const noexcept { return m_backer.slot_count(); }
 
 			/**
 			 * Return the buffer of the pipe in term of time.
 			 */
-			Duration capacity_time() const noexcept { return m_metadata.m_period_time * m_metadata.m_capacity; }
+			Duration capacity_time() const noexcept { return m_metadata.m_period_time * m_backer.slot_count(); }
 
 			/**
 			 * Return the buffer of the pipe in term of size.
 			 */
-			std::size_t capacity_size() const noexcept { return m_metadata.m_period_size * m_metadata.m_capacity; }
+			std::size_t capacity_size() const noexcept { return m_metadata.m_period_size * m_backer.slot_count(); }
 
 			Pipe(const Pipe& pipe) = delete;
 			Pipe(Pipe&& pipe) = delete;
@@ -175,6 +175,12 @@ namespace Piper
 			friend class Outlet;
 
 		private:
+
+			/**
+			 * Pipe metadata version code specifies the version of the metadata
+			 * header.
+			 */
+			static const std::uint32_t VERSION = 1;
 
 			/**
 			 * Format length is a constant representing the maximum length of format
@@ -189,6 +195,7 @@ namespace Piper
 			 */
 			struct Metadata
 			{
+				std::uint32_t m_version = VERSION;
 				char m_format[MAX_FORMAT_SIZE];
 				Channel m_channels;
 				Rate m_rate;
@@ -197,19 +204,27 @@ namespace Piper
 				Duration m_period_time;
 				std::uint32_t m_readable;
 				std::uint32_t m_writable;
-				std::uint32_t m_capacity;
 
 				explicit Metadata() = default;
-				explicit Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation);
+				explicit Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable);
 				explicit Metadata(const Metadata& metadata);
 				Metadata& operator=(const Metadata& metadata);
 			};
+
+			static_assert(offsetof(Metadata, m_format) - offsetof(Metadata, m_version) == sizeof(Metadata::m_version), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_channels) - offsetof(Metadata, m_format) == sizeof(Metadata::m_format), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_rate) - offsetof(Metadata, m_channels) == sizeof(Metadata::m_channels), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_frame_size) - offsetof(Metadata, m_rate) == sizeof(Metadata::m_rate), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_period_size) - offsetof(Metadata, m_frame_size) == sizeof(Metadata::m_frame_size), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_period_time) - offsetof(Metadata, m_period_size) == sizeof(Metadata::m_period_size), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_readable) - offsetof(Metadata, m_period_time) == sizeof(Metadata::m_period_time), "incorrect layout for pipe metadata");
+			static_assert(offsetof(Metadata, m_writable) - offsetof(Metadata, m_readable) == sizeof(Metadata::m_readable), "incorrect layout for pipe metadata");
+			static_assert(sizeof(Metadata) - offsetof(Metadata, m_writable) == sizeof(Metadata::m_writable), "incorrect layout for pipe metadata");
 
 			Metadata m_metadata;
 			Backer m_backer;
 			Medium m_medium;
 			Transport m_transport;
-
 	};
 
 	/**
