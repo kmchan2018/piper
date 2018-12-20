@@ -144,37 +144,38 @@ namespace Piper
 			static const std::uint32_t VERSION = 1;
 
 			/**
-			 * Component Limit.
+			 * Component limit represents the maximum number of components a
+			 * block can have in the transport.
 			 */
 			static const unsigned int MAX_COMPONENT_COUNT = 15;
 
 			/**
-			 * Channel header contains common properties of the pipe and is stored
-			 * in the initial page of the mapped file. It contains the following
-			 * fields:
+			 * Channel header contains common properties of the transport and is
+			 * stored in the initial page of the mapped file. It contains the
+			 * following fields:
 			 *
-			 * `slot_count` indicates the size of the ring buffer in term of blocks.
+			 * `slot_count` indicates the size of the transport in term of blocks.
 			 * It includes both the readbale and writable blocks.
 			 *
 			 * `component_count` indicates the number of components each block
 			 * contains.
 			 *
-			 * The size fields define the size of various transport elements in bytes:
-			 * `metadata_size` for transport metadata; `component_sizes` for each
-			 * block component.
+			 * The size fields define the size of various transport elements in
+			 * bytes: `page_size` for memory page; `metadata_size` for transport
+			 * metadata; `component_sizes` for each block component.
 			 *
 			 * `writes` is an atomic counter tracking the number of blocks written
-			 * to the transport. It also indicates the position of the staging block
-			 * in the buffer. Please note that each transport can only have one
-			 * write position shared among all users.
+			 * to the transport. It also indicates the position of the first writable
+			 * block in the transport. Please note that each transport can only have
+			 * one write position shared among all users.
 			 *
 			 * `tickets` is an atomic counter tracking the number of tickets issued.
 			 * The counter is used to derive a globally unique identifier for update
 			 * sessions.
 			 *
 			 * `session` is an atomic variable tracking the current update session.
-			 * Only the session starter is allowed to update the pipe. If there is
-			 * no active session, a special sentinel value is stored.
+			 * Only the session starter is allowed to update the transport. If there
+			 * is no active session, a special sentinel value is stored.
 			 */
 			struct Header
 			{
@@ -187,9 +188,6 @@ namespace Piper
 				WriteCounter writes;
 				TicketCounter tickets;
 				SessionMarker session;
-
-				static_assert(sizeof(unsigned int) >= sizeof(std::uint32_t), "possible precision loss");
-				static_assert(sizeof(std::size_t) >= sizeof(std::uint32_t), "possible precision loss");
 			};
 
 			static_assert(sizeof(WriteCounter) == sizeof(Position), "incorrect layout for transport header");
@@ -205,6 +203,9 @@ namespace Piper
 			static_assert(offsetof(Header, tickets) - offsetof(Header, writes) == sizeof(Header::tickets), "incorrect layout for transport header");
 			static_assert(offsetof(Header, session) - offsetof(Header, tickets) == sizeof(Header::session), "incorrect layout for transport header");
 			static_assert(sizeof(Header) - offsetof(Header, session) == sizeof(Header::session), "incorrect layout for transport header");
+
+			static_assert(sizeof(unsigned int) >= sizeof(std::uint32_t), "possible precision loss");
+			static_assert(sizeof(std::size_t) >= sizeof(std::uint32_t), "possible precision loss");
 
 			std::string m_path;
 			File m_file;
@@ -249,11 +250,6 @@ namespace Piper
 			 * Return the backing file.
 			 */
 			const Backer& backer() const noexcept { return m_backer; }
-
-			/**
-			 * Return the backing file.
-			 */
-			Backer& backer() noexcept { return m_backer; }
 
 			/**
 			 * Return the reference to the write counter.
@@ -382,11 +378,6 @@ namespace Piper
 			const Medium& medium() const noexcept { return m_medium; }
 
 			/**
-			 * Get the medium.
-			 */
-			Medium& medium() noexcept { return m_medium; }
-
-			/**
 			 * Get the read window aka the maximum number of readable blocks.
 			 */
 			unsigned int readable() const noexcept { return m_readable; }
@@ -450,7 +441,7 @@ namespace Piper
 			/**
 			 * Flush the first writable block. The block will be converted into a
 			 * readable block, and a new writable block will be appended to the end
-			 * of the pipe. The method requires an active update session id and
+			 * of the transport. The method requires an active update session id and
 			 * throws an invalid argument exception when an incorrect session id is
 			 * provided.
 			 */
