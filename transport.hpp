@@ -139,6 +139,11 @@ namespace Piper
 		private:
 
 			/**
+			 * Component Limit.
+			 */
+			static const unsigned int MAX_COMPONENT_COUNT = 16;
+
+			/**
 			 * Channel header contains common properties of the pipe and is stored
 			 * in the initial page of the mapped file. It contains the following
 			 * fields:
@@ -171,7 +176,7 @@ namespace Piper
 				std::uint32_t slot_count;
 				std::uint32_t component_count;
 				std::uint32_t metadata_size;
-				std::uint32_t component_sizes[16];
+				std::uint32_t component_sizes[MAX_COMPONENT_COUNT];
 				WriteCounter writes;
 				TicketCounter tickets;
 				SessionMarker session;
@@ -193,8 +198,8 @@ namespace Piper
 			std::size_t m_header_size;
 			std::size_t m_metadata_offset;
 			std::size_t m_metadata_size;
-			std::size_t m_component_offsets[16];
-			std::size_t m_component_sizes[16];
+			std::size_t m_component_offsets[MAX_COMPONENT_COUNT];
+			std::size_t m_component_sizes[MAX_COMPONENT_COUNT];
 			std::size_t m_total_size;
 
 	};

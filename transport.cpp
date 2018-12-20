@@ -70,7 +70,7 @@ namespace Piper
 			throw InvalidArgumentException("invalid slot count", "transport.cpp", __LINE__);
 		} else if (m_component_count <= 0) {
 			throw InvalidArgumentException("invalid component count", "transport.cpp", __LINE__);
-		} else if (m_component_count > 16) {
+		} else if (m_component_count > MAX_COMPONENT_COUNT) {
 			throw InvalidArgumentException("invalid component count", "transport.cpp", __LINE__);
 		} else if (m_metadata_size == 0) {
 			throw InvalidArgumentException("invalid metadata size", "transport.cpp", __LINE__);
@@ -99,7 +99,7 @@ namespace Piper
 			}
 		}
 
-		for (unsigned int i = m_component_count; i < 16; i++) {
+		for (unsigned int i = m_component_count; i < MAX_COMPONENT_COUNT; i++) {
 			m_component_offsets[i] = 0;
 			m_component_sizes[i] = header.component_sizes[i] = 0;
 		}
@@ -131,7 +131,7 @@ namespace Piper
 			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
 		} else if (header.component_count == 0) {
 			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
-		} else if (header.component_count > 16) {
+		} else if (header.component_count > MAX_COMPONENT_COUNT) {
 			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
 		} else if (header.metadata_size == 0) {
 			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
@@ -153,7 +153,7 @@ namespace Piper
 			}
 		}
 
-		for (unsigned int i = m_component_count; i < 16; i++) {
+		for (unsigned int i = m_component_count; i < MAX_COMPONENT_COUNT; i++) {
 			m_component_offsets[i] = 0;
 			m_component_sizes[i] = 0;
 		}
