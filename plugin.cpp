@@ -481,39 +481,45 @@ extern "C"
 			plugin->callback.transfer = piper_playback_transfer;
 			plugin->callback.close = piper_playback_close;
 
-			for (unsigned int i = 0; i < plugin->pipe->channels(); i++) {
+			snd_pcm_format_t format = plugin->pipe->format_code_alsa();
+			unsigned int channels = plugin->pipe->channels();
+			unsigned int rate = plugin->pipe->rate();
+			std::size_t frame_size = plugin->pipe->frame_size();
+			std::size_t period_size = plugin->pipe->period_size();
+
+			for (unsigned int i = 0; i < channels; i++) {
 				plugin->areas[i].addr = nullptr;
-				plugin->areas[i].first = snd_pcm_format_physical_width(plugin->pipe->format()) * i;
-				plugin->areas[i].step = 8 * plugin->pipe->frame_size();
+				plugin->areas[i].first = snd_pcm_format_physical_width(format) * i;
+				plugin->areas[i].step = 8 * frame_size;
 			}
 
-			unsigned int accesses[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
-			unsigned int format = static_cast<unsigned int>(plugin->pipe->format());
-			unsigned int channels = static_cast<unsigned int>(plugin->pipe->channels());
-			unsigned int rate = static_cast<unsigned int>(plugin->pipe->rate());
-			unsigned int period = static_cast<unsigned int>(plugin->pipe->period_size());
+			unsigned int access_list[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
+			unsigned int format_list[] = { static_cast<unsigned int>(format) };
+			unsigned int channels_list[] = { channels };
+			unsigned int rate_list[] = { rate };
+			unsigned int period_list[] = { static_cast<unsigned int>(period_size) };
 			int err = 0;
 
 			if ((err = snd_pcm_ioplug_create(&plugin->io, name, stream, mode)) < 0) {
 				SNDERR("device %s cannot be initialized: snd_pcm_ioplug_create fail to complete", name, err);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_ACCESS, 2, accesses)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_ACCESS, 2, access_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_ACCESS", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_FORMAT, 1, &format)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_FORMAT, 1, format_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_FORMAT", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_CHANNELS, 1, &channels)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_CHANNELS", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_RATE, 1, &rate)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_RATE, 1, rate_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_RATE", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, &period)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_PERIOD_BYTES", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
@@ -930,39 +936,45 @@ extern "C"
 			plugin->callback.transfer = piper_capture_transfer;
 			plugin->callback.close = piper_capture_close;
 
-			for (unsigned int i = 0; i < plugin->pipe->channels(); i++) {
+			snd_pcm_format_t format = plugin->pipe->format_code_alsa();
+			unsigned int channels = plugin->pipe->channels();
+			unsigned int rate = plugin->pipe->rate();
+			std::size_t frame_size = plugin->pipe->frame_size();
+			std::size_t period_size = plugin->pipe->period_size();
+
+			for (unsigned int i = 0; i < channels; i++) {
 				plugin->areas[i].addr = nullptr;
-				plugin->areas[i].first = snd_pcm_format_physical_width(plugin->pipe->format()) * i;
-				plugin->areas[i].step = 8 * plugin->pipe->frame_size();
+				plugin->areas[i].first = snd_pcm_format_physical_width(format) * i;
+				plugin->areas[i].step = 8 * frame_size;
 			}
 
-			unsigned int accesses[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
-			unsigned int format = static_cast<unsigned int>(plugin->pipe->format());
-			unsigned int channels = static_cast<unsigned int>(plugin->pipe->channels());
-			unsigned int rate = static_cast<unsigned int>(plugin->pipe->rate());
-			unsigned int period = static_cast<unsigned int>(plugin->pipe->period_size());
+			unsigned int access_list[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
+			unsigned int format_list[] = { static_cast<unsigned int>(format) };
+			unsigned int channels_list[] = { channels };
+			unsigned int rate_list[] = { rate };
+			unsigned int period_list[] = { static_cast<unsigned int>(period_size) };
 			int err = 0;
 
 			if ((err = snd_pcm_ioplug_create(&plugin->io, name, stream, mode)) < 0) {
 				SNDERR("device %s cannot be initialized: snd_pcm_ioplug_create fail to complete", name, err);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_ACCESS, 2, accesses)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_ACCESS, 2, access_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_ACCESS", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_FORMAT, 1, &format)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_FORMAT, 1, format_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_FORMAT", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_CHANNELS, 1, &channels)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_CHANNELS", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_RATE, 1, &rate)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_RATE, 1, rate_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_RATE", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;
-			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, &period)) < 0) {
+			} else if ((err = snd_pcm_ioplug_set_param_list(&plugin->io, SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list)) < 0) {
 				SNDERR("device %s cannot be initialized: cannot configure hardware parameter SND_PCM_IOPLUG_HW_PERIOD_BYTES", name);
 				snd_pcm_ioplug_delete(&plugin->io);
 				return err;

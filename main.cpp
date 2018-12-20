@@ -63,15 +63,15 @@ void check() {
  */
 int create(int argc, char **argv) {
 	if (argc >= 9) {
-		Piper::Format format = snd_pcm_format_value(argv[3]);
+		const char* format = argv[3];
 		Piper::Channel channels = std::atoi(argv[4]);
 		Piper::Rate rate = std::atoi(argv[5]);
 		Piper::Duration period = std::atoi(argv[6]) * 1000000;
 		unsigned int buffer = std::atoi(argv[7]);
 		unsigned int capacity = std::atoi(argv[8]);
 
-		if (format == SND_PCM_FORMAT_UNKNOWN) {
-			std::fprintf(stderr, "ERROR: format %s not recognized\n\n", argv[3]);
+		if (snd_pcm_format_value(format) == SND_PCM_FORMAT_UNKNOWN) {
+			std::fprintf(stderr, "ERROR: format %s is not recognized\n\n", format);
 			return 2;
 		} else if (channels == 0) {
 			std::fprintf(stderr, "ERROR: channels cannot be zero\n\n");
@@ -120,7 +120,7 @@ int info(int argc, char **argv)
 			fprintf(stderr, "\n");
 			fprintf(stderr, "  Pipe details\n");
 			fprintf(stderr, " ======================================================\n");
-			fprintf(stderr, "  Format: %s\n", snd_pcm_format_name(pipe.format()));
+			fprintf(stderr, "  Format: %s\n", pipe.format_name());
 			fprintf(stderr, "  Channels: %u\n", pipe.channels());
 			fprintf(stderr, "  Sampling Rate: %u\n", pipe.rate());
 			fprintf(stderr, "  Frame: %zu bytes\n", pipe.frame_size());

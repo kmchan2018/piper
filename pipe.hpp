@@ -6,6 +6,10 @@
 #include <vector>
 
 #include <alsa/asoundlib.h>
+#ifdef USE_PULSE
+#include <pulse/simple.h>
+#include <pulse/error.h>
+#endif
 
 #include "exception.hpp"
 #include "timestamp.hpp"
@@ -19,12 +23,6 @@
 
 namespace Piper
 {
-
-	/**
-	 * Format describes the representation of audio frames like number of bits
-	 * per sample, signedness, endianness, etc.
-	 */
-	typedef snd_pcm_format_t Format;
 
 	/**
 	 * Channel indicates the number of channels in a frame. Valid values ranges
@@ -62,7 +60,7 @@ namespace Piper
 			 * Create a new pipe with the given parameters. The method will
 			 * throw exception when it cannot create the file.
 			 */
-			explicit Pipe(const char* path, Format format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode); 
+			explicit Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode); 
 
 			/**
 			 * Open an existing pipe. The method will throw exception when it
@@ -82,9 +80,21 @@ namespace Piper
 			const Transport& transport() const noexcept { return m_transport; }
 
 			/**
-			 * Return the format of the pipe.
+			 * Return the format name of the pipe.
 			 */
-			Format format() const noexcept { return m_metadata.m_format; }
+			const char* format_name() const noexcept { return m_metadata.m_format; }
+
+			/**
+			 * Return the ALSA format code of the pipe.
+			 */
+			snd_pcm_format_t format_code_alsa() const noexcept;
+
+#ifdef USE_PULSE
+			/**
+			 * Return the Pulseaudio format code of the pipe.
+			 */
+			pa_sample_format_t format_code_alsa() const noexcept;
+#endif
 
 			/**
 			 * Return the channel of the pipe.
@@ -157,7 +167,7 @@ namespace Piper
 			 */
 			struct Metadata
 			{
-				Format m_format;
+				char m_format[24];
 				Channel m_channels;
 				Rate m_rate;
 				std::uint32_t m_frame_size;
@@ -167,7 +177,7 @@ namespace Piper
 				std::uint32_t m_capacity;
 
 				explicit Metadata() = default;
-				explicit Metadata(Format format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity);
+				explicit Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity);
 				explicit Metadata(const Metadata& metadata);
 				Metadata& operator=(const Metadata& metadata);
 			};
@@ -354,6 +364,15 @@ namespace Piper
 			Transport& m_transport;
 
 	};
+
+#ifdef USE_PULSE
+	/**
+	 * Thrown when the format is not supported.
+	 */
+	class UnsupportedFormatException : Exception
+	{
+	}
+#endif
 
 };
 

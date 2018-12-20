@@ -7,10 +7,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
 #include <alsa/asoundlib.h>
+#ifdef USE_PULSE
+#include <pulse/simple.h>
+#include <pulse/error.h>
+#endif
 
 #include "exception.hpp"
 #include "timestamp.hpp"
@@ -28,7 +33,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	std::size_t calculate_frame_size(Format format, Channel channels)
+	std::size_t calculate_frame_size(snd_pcm_format_t format, Channel channels)
 	{
 		ssize_t result = snd_pcm_format_size(format, channels);
 		if (result > 0) {
@@ -38,7 +43,7 @@ namespace Piper
 		}
 	}
 
-	std::size_t calculate_period_size(Format format, Channel channels, Rate rate, Duration period)
+	std::size_t calculate_period_size(snd_pcm_format_t format, Channel channels, Rate rate, Duration period)
 	{
 		std::size_t frame_size = calculate_frame_size(format, channels);
 		std::size_t scaled_period_size = frame_size * rate * period;
@@ -55,8 +60,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	inline Pipe::Metadata::Metadata(Format format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity) :
-		m_format(format),
+	inline Pipe::Metadata::Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity) :
 		m_channels(channels),
 		m_rate(rate),
 		m_frame_size(0),
@@ -65,7 +69,9 @@ namespace Piper
 		m_buffer(buffer),
 		m_capacity(capacity)
 	{
-		if (m_format == 0) {
+		snd_pcm_format_t code = snd_pcm_format_value(format);
+
+		if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -82,13 +88,15 @@ namespace Piper
 		} else if (m_capacity > UINT32_MAX) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
-			m_frame_size = calculate_frame_size(m_format, m_channels);
-			m_period_size = calculate_period_size(m_format, m_channels, m_rate, m_period_time);
+			std::memset(m_format, 0, sizeof(m_format));
+			std::memcpy(m_format, format, sizeof(m_format) - 1);
+
+			m_frame_size = calculate_frame_size(code, m_channels);
+			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
 		}
 	}
 
 	inline Pipe::Metadata::Metadata(const Metadata& metadata) :
-		m_format(metadata.m_format),
 		m_channels(metadata.m_channels),
 		m_rate(metadata.m_rate),
 		m_frame_size(0),
@@ -97,7 +105,9 @@ namespace Piper
 		m_buffer(metadata.m_buffer),
 		m_capacity(metadata.m_capacity)
 	{
-		if (m_format == 0) {
+		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
+
+		if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -114,14 +124,19 @@ namespace Piper
 		} else if (m_capacity > UINT32_MAX) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
-			m_frame_size = calculate_frame_size(m_format, m_channels);
-			m_period_size = calculate_period_size(m_format, m_channels, m_rate, m_period_time);
+			std::memset(m_format, 0, sizeof(m_format));
+			std::memcpy(m_format, metadata.m_format, sizeof(m_format) - 1);
+
+			m_frame_size = calculate_frame_size(code, m_channels);
+			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
 		}
 	}
 
 	inline Pipe::Metadata& Pipe::Metadata::operator=(const Metadata& metadata)
 	{
-		if (metadata.m_format == 0) {
+		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
+
+		if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (metadata.m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -134,14 +149,17 @@ namespace Piper
 		} else if (metadata.m_capacity <= metadata.m_buffer) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
-			m_format = metadata.m_format;
+			std::memset(m_format, 0, sizeof(m_format));
+			std::memcpy(m_format, metadata.m_format, sizeof(m_format) - 1);
+
 			m_channels = metadata.m_channels;
 			m_rate = metadata.m_rate;
-			m_frame_size = calculate_frame_size(m_format, m_channels);
+			m_frame_size = calculate_frame_size(code, m_channels);
 			m_period_time = metadata.m_period_time;
-			m_period_size = calculate_period_size(m_format, m_channels, m_rate, m_period_time);
+			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
 			m_buffer = metadata.m_buffer;
 			m_capacity = metadata.m_capacity;
+
 			return *this;
 		}
 	}
@@ -152,7 +170,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	Pipe::Pipe(const char* path, Format format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode) :
+	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode) :
 		m_metadata(format, channels, rate, period, buffer, capacity),
 		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, capacity, mode),
 		m_medium(m_backer),
@@ -183,6 +201,33 @@ namespace Piper
 			}
 		}
 	}
+
+	snd_pcm_format_t Pipe::format_code_alsa() const noexcept
+	{
+		return snd_pcm_format_value(m_metadata.m_format);
+	}
+
+#ifdef USE_PULSE
+	pa_sample_format_t Pipe::format_code_pulse() const
+	{
+		switch (snd_pcm_format_value(m_metadata.m_format)) {
+			case SND_PCM_FORMAT_U8:       return PA_SAMPLE_U8;
+			case SND_PCM_FORMAT_S16_LE:   return PA_SAMPLE_S16LE;
+			case SND_PCM_FORMAT_S16_BE:   return PA_SAMPLE_S16BE;
+			case SND_PCM_FORMAT_FLOAT_LE: return PA_SAMPLE_FLOAT32LE;
+			case SND_PCM_FORMAT_FLOAT_BE: return PA_SAMPLE_FLOAT32BE;
+			case SND_PCM_FORMAT_A_LAW:    return PA_SAMPLE_ALAW;
+			case SND_PCM_FORMAT_MU_LAW:   return PA_SAMPLE_ULAW;
+			case SND_PCM_FORMAT_S32_LE:   return PA_SAMPLE_S32LE;
+			case SND_PCM_FORMAT_S32_BE:   return PA_SAMPLE_S32BE;
+			case SND_PCM_FORMAT_S24_3LE:  return PA_SAMPLE_S24LE;
+			case SND_PCM_FORMAT_S24_3BE:  return PA_SAMPLE_S24BE;
+			case SND_PCM_FORMAT_S24_LE:   return PA_SAMPLE_S24_32LE;
+			case SND_PCM_FORMAT_S24_BE:   return PA_SAMPLE_S24_32BE;
+			default: throw UnsupportedFormatException("unsupported format", "pipe.cpp", __LINE__);
+		}
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	//
