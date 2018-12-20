@@ -72,7 +72,9 @@ namespace Piper
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(format);
 
-		if (code == SND_PCM_FORMAT_UNKNOWN) {
+		if (strlen(format) >= MAX_FORMAT_SIZE) {
+			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
+		} else if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -89,8 +91,8 @@ namespace Piper
 		} else if (m_writable > UINT32_MAX) {
 			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
 		} else {
-			std::memset(m_format, 0, sizeof(m_format));
-			std::memcpy(m_format, format, sizeof(m_format) - 1);
+			std::memset(m_format, 0, MAX_FORMAT_SIZE);
+			std::memcpy(m_format, format, MAX_FORMAT_SIZE - 1);
 
 			m_frame_size = calculate_frame_size(code, m_channels);
 			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
@@ -109,7 +111,9 @@ namespace Piper
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
 
-		if (code == SND_PCM_FORMAT_UNKNOWN) {
+		if (strlen(metadata.m_format) >= MAX_FORMAT_SIZE) {
+			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
+		} else if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -124,8 +128,8 @@ namespace Piper
 		} else if (m_capacity < m_readable + m_writable) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
-			std::memset(m_format, 0, sizeof(m_format));
-			std::memcpy(m_format, metadata.m_format, sizeof(m_format) - 1);
+			std::memset(m_format, 0, MAX_FORMAT_SIZE);
+			std::memcpy(m_format, metadata.m_format, MAX_FORMAT_SIZE - 1);
 
 			m_frame_size = calculate_frame_size(code, m_channels);
 			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
@@ -136,7 +140,9 @@ namespace Piper
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
 
-		if (code == SND_PCM_FORMAT_UNKNOWN) {
+		if (strlen(metadata.m_format) >= MAX_FORMAT_SIZE) {
+			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
+		} else if (code == SND_PCM_FORMAT_UNKNOWN) {
 			throw InvalidArgumentException("invalid format", "pipe.cpp", __LINE__);
 		} else if (metadata.m_channels == 0) {
 			throw InvalidArgumentException("invalid channels", "pipe.cpp", __LINE__);
@@ -151,8 +157,8 @@ namespace Piper
 		} else if (metadata.m_capacity < metadata.m_readable + metadata.m_writable) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
-			std::memset(m_format, 0, sizeof(m_format));
-			std::memcpy(m_format, metadata.m_format, sizeof(m_format) - 1);
+			std::memset(m_format, 0, MAX_FORMAT_SIZE);
+			std::memcpy(m_format, metadata.m_format, MAX_FORMAT_SIZE - 1);
 
 			m_channels = metadata.m_channels;
 			m_rate = metadata.m_rate;

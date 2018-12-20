@@ -177,12 +177,19 @@ namespace Piper
 		private:
 
 			/**
+			 * Format length is a constant representing the maximum length of format
+			 * strings including the terminating NULL. It also represents the space
+			 * reserved for the format field in the metadata structure.
+			 */
+			static const unsigned int MAX_FORMAT_SIZE = 28;
+
+			/**
 			 * Metadata stores information about a pipe, including acceptable audio
 			 * format, buffer size, etc.
 			 */
 			struct Metadata
 			{
-				char m_format[24];
+				char m_format[MAX_FORMAT_SIZE];
 				Channel m_channels;
 				Rate m_rate;
 				std::uint32_t m_frame_size;
