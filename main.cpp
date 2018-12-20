@@ -62,13 +62,14 @@ void check() {
  * Create a new pipe.
  */
 int create(int argc, char **argv) {
-	if (argc >= 9) {
+	if (argc >= 10) {
 		const char* format = argv[3];
 		Piper::Channel channels = std::atoi(argv[4]);
 		Piper::Rate rate = std::atoi(argv[5]);
 		Piper::Duration period = std::atoi(argv[6]) * 1000000;
-		unsigned int buffer = std::atoi(argv[7]);
-		unsigned int capacity = std::atoi(argv[8]);
+		unsigned int readable = std::atoi(argv[7]);
+		unsigned int writable = std::atoi(argv[8]);
+		unsigned int separation = std::atoi(argv[9]);
 
 		if (snd_pcm_format_value(format) == SND_PCM_FORMAT_UNKNOWN) {
 			std::fprintf(stderr, "ERROR: format %s is not recognized\n\n", format);
@@ -79,16 +80,16 @@ int create(int argc, char **argv) {
 		} else if (rate == 0) {
 			std::fprintf(stderr, "ERROR: rate cannot be zero\n\n");
 			return 2;
-		} else if (buffer <= 1) {
-			std::fprintf(stderr, "ERROR: buffer should be larger than 1\n\n");
+		} else if (readable <= 1) {
+			std::fprintf(stderr, "ERROR: readable should be larger than 1\n\n");
 			return 2;
-		} else if (capacity <= buffer) {
-			std::fprintf(stderr, "ERROR: capacity should be larger than buffer\n\n");
+		} else if (writable <= 1) {
+			std::fprintf(stderr, "ERROR: writable should be larger than 1\n\n");
 			return 2;
 		}
 
 		try {
-			Piper::Pipe pipe(argv[2], format, channels, rate, period, buffer, capacity, 0640);
+			Piper::Pipe pipe(argv[2], format, channels, rate, period, readable, writable, separation, 0640);
 			return 0;
 		} catch (Piper::Exception& ex) {
 			std::fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
@@ -125,7 +126,8 @@ int info(int argc, char **argv)
 			fprintf(stderr, "  Sampling Rate: %u\n", pipe.rate());
 			fprintf(stderr, "  Frame: %zu bytes\n", pipe.frame_size());
 			fprintf(stderr, "  Period: %zu bytes or %lu ns\n", pipe.period_size(), pipe.period_time());
-			fprintf(stderr, "  Writable: %u periods or %zu bytes or %lu ns\n", pipe.buffer(), pipe.buffer_size(), pipe.buffer_time());
+			fprintf(stderr, "  Readable: %u periods or %zu bytes or %lu ns\n", pipe.readable(), pipe.readable_size(), pipe.readable_time());
+			fprintf(stderr, "  Writable: %u periods or %zu bytes or %lu ns\n", pipe.writable(), pipe.writable_size(), pipe.writable_time());
 			fprintf(stderr, "  Capacity: %u periods or %zu bytes or %lu ns\n", pipe.capacity(), pipe.capacity_size(), pipe.capacity_time());
 			fprintf(stderr, "\n");
 			fprintf(stderr, "  Transport details\n");

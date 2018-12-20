@@ -60,14 +60,15 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	inline Pipe::Metadata::Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity) :
+	inline Pipe::Metadata::Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation) :
 		m_channels(channels),
 		m_rate(rate),
 		m_frame_size(0),
 		m_period_size(0),
 		m_period_time(period),
-		m_buffer(buffer),
-		m_capacity(capacity)
+		m_readable(readable),
+		m_writable(writable),
+		m_capacity(readable + writable + separation)
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(format);
 
@@ -79,14 +80,14 @@ namespace Piper
 			throw InvalidArgumentException("invalid rate", "pipe.cpp", __LINE__);
 		} else if (m_period_time == 0) {
 			throw InvalidArgumentException("invalid period", "pipe.cpp", __LINE__);
-		} else if (m_buffer <= 1) {
-			throw InvalidArgumentException("invalid buffer", "pipe.cpp", __LINE__);
-		} else if (m_buffer > UINT32_MAX) {
-			throw InvalidArgumentException("invalid buffer", "pipe.cpp", __LINE__);
-		} else if (m_capacity <= m_buffer) {
-			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
-		} else if (m_capacity > UINT32_MAX) {
-			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
+		} else if (m_readable <= 1) {
+			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
+		} else if (m_readable > UINT32_MAX) {
+			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
+		} else if (m_writable <= 1) {
+			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
+		} else if (m_writable > UINT32_MAX) {
+			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
 		} else {
 			std::memset(m_format, 0, sizeof(m_format));
 			std::memcpy(m_format, format, sizeof(m_format) - 1);
@@ -102,7 +103,8 @@ namespace Piper
 		m_frame_size(0),
 		m_period_size(0),
 		m_period_time(metadata.m_period_time),
-		m_buffer(metadata.m_buffer),
+		m_readable(metadata.m_readable),
+		m_writable(metadata.m_writable),
 		m_capacity(metadata.m_capacity)
 	{
 		snd_pcm_format_t code = snd_pcm_format_value(metadata.m_format);
@@ -115,13 +117,11 @@ namespace Piper
 			throw InvalidArgumentException("invalid rate", "pipe.cpp", __LINE__);
 		} else if (m_period_time == 0) {
 			throw InvalidArgumentException("invalid period", "pipe.cpp", __LINE__);
-		} else if (m_buffer <= 1) {
-			throw InvalidArgumentException("invalid buffer", "pipe.cpp", __LINE__);
-		} else if (m_buffer > UINT32_MAX) {
-			throw InvalidArgumentException("invalid buffer", "pipe.cpp", __LINE__);
-		} else if (m_capacity <= m_buffer) {
-			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
-		} else if (m_capacity > UINT32_MAX) {
+		} else if (m_readable <= 1) {
+			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
+		} else if (m_writable <= 1) {
+			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
+		} else if (m_capacity < m_readable + m_writable) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
 			std::memset(m_format, 0, sizeof(m_format));
@@ -144,9 +144,11 @@ namespace Piper
 			throw InvalidArgumentException("invalid rate", "pipe.cpp", __LINE__);
 		} else if (metadata.m_period_time == 0) {
 			throw InvalidArgumentException("invalid period", "pipe.cpp", __LINE__);
-		} else if (metadata.m_buffer <= 1) {
-			throw InvalidArgumentException("invalid buffer", "pipe.cpp", __LINE__);
-		} else if (metadata.m_capacity <= metadata.m_buffer) {
+		} else if (metadata.m_readable <= 1) {
+			throw InvalidArgumentException("invalid readable", "pipe.cpp", __LINE__);
+		} else if (metadata.m_writable <= 1) {
+			throw InvalidArgumentException("invalid writable", "pipe.cpp", __LINE__);
+		} else if (metadata.m_capacity < metadata.m_readable + metadata.m_writable) {
 			throw InvalidArgumentException("invalid capacity", "pipe.cpp", __LINE__);
 		} else {
 			std::memset(m_format, 0, sizeof(m_format));
@@ -157,7 +159,8 @@ namespace Piper
 			m_frame_size = calculate_frame_size(code, m_channels);
 			m_period_time = metadata.m_period_time;
 			m_period_size = calculate_period_size(code, m_channels, m_rate, m_period_time);
-			m_buffer = metadata.m_buffer;
+			m_readable = metadata.m_readable;
+			m_writable = metadata.m_writable;
 			m_capacity = metadata.m_capacity;
 
 			return *this;
@@ -170,13 +173,14 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode) :
-		m_metadata(format, channels, rate, period, buffer, capacity),
-		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, capacity, mode),
+	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, int mode) :
+		m_metadata(format, channels, rate, period, readable, writable, separation),
+		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, m_metadata.m_capacity, mode),
 		m_medium(m_backer),
 		m_transport(m_medium)
 	{
-		m_transport.reserve(m_metadata.m_buffer);
+		m_transport.set_writable(m_metadata.m_writable);
+		m_transport.set_readable(m_metadata.m_readable);
 	}
 
 	Pipe::Pipe(const char* path) :
@@ -197,7 +201,8 @@ namespace Piper
 				throw InvalidArgumentException("invalid pipe file", "pipe.cpp", __LINE__);
 			} else {
 				m_metadata = temp;
-				m_transport.reserve(m_metadata.m_buffer);
+				m_transport.set_writable(m_metadata.m_writable);
+				m_transport.set_readable(m_metadata.m_readable);
 			}
 		}
 	}

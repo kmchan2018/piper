@@ -60,7 +60,7 @@ namespace Piper
 			 * Create a new pipe with the given parameters. The method will
 			 * throw exception when it cannot create the file.
 			 */
-			explicit Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity, int mode); 
+			explicit Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, int mode); 
 
 			/**
 			 * Open an existing pipe. The method will throw exception when it
@@ -122,19 +122,34 @@ namespace Piper
 			std::size_t period_size() const noexcept { return m_metadata.m_period_size; }
 
 			/**
-			 * Return the buffer of the pipe in term of period.
+			 * Return the read window of the pipe in term of period.
 			 */
-			unsigned int buffer() const noexcept { return m_metadata.m_buffer; };
+			unsigned int readable() const noexcept { return m_metadata.m_readable; };
 
 			/**
-			 * Return the buffer of the pipe in term of time.
+			 * Return the read window of the pipe in term of time.
 			 */
-			Duration buffer_time() const noexcept { return m_metadata.m_period_time * m_metadata.m_buffer; }
+			Duration readable_time() const noexcept { return m_metadata.m_period_time * m_metadata.m_readable; }
 
 			/**
-			 * Return the buffer of the pipe in term of size.
+			 * Return the read window of the pipe in term of size.
 			 */
-			std::size_t buffer_size() const noexcept { return m_metadata.m_period_size * m_metadata.m_buffer; }
+			std::size_t readable_size() const noexcept { return m_metadata.m_period_size * m_metadata.m_readable; }
+
+			/**
+			 * Return the write window of the pipe in term of period.
+			 */
+			unsigned int writable() const noexcept { return m_metadata.m_writable; };
+
+			/**
+			 * Return the write window of the pipe in term of time.
+			 */
+			Duration writable_time() const noexcept { return m_metadata.m_period_time * m_metadata.m_writable; }
+
+			/**
+			 * Return the write window of the pipe in term of size.
+			 */
+			std::size_t writable_size() const noexcept { return m_metadata.m_period_size * m_metadata.m_writable; }
 
 			/**
 			 * Return the capacity of the pipe in term of period.
@@ -173,11 +188,12 @@ namespace Piper
 				std::uint32_t m_frame_size;
 				std::uint32_t m_period_size;
 				Duration m_period_time;
-				std::uint32_t m_buffer;
+				std::uint32_t m_readable;
+				std::uint32_t m_writable;
 				std::uint32_t m_capacity;
 
 				explicit Metadata() = default;
-				explicit Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int buffer, unsigned int capacity);
+				explicit Metadata(const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation);
 				explicit Metadata(const Metadata& metadata);
 				Metadata& operator=(const Metadata& metadata);
 			};

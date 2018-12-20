@@ -366,7 +366,19 @@ namespace Piper
 		}
 	}
 
-	void Transport::reserve(unsigned int writable)
+	void Transport::set_readable(unsigned int readable)
+	{
+		if (readable < 1) {
+			throw InvalidArgumentException("invalid readable", "transport.cpp", __LINE__);
+		} else if (readable >= m_capacity) {
+			throw InvalidArgumentException("invalid readable", "transport.cpp", __LINE__);
+		} else {
+			m_readable = readable;
+			m_writable = std::max(m_writable, m_capacity - m_readable);
+		}
+	}
+
+	void Transport::set_writable(unsigned int writable)
 	{
 		if (writable < 1) {
 			throw InvalidArgumentException("invalid writable", "transport.cpp", __LINE__);
@@ -374,7 +386,7 @@ namespace Piper
 			throw InvalidArgumentException("invalid writable", "transport.cpp", __LINE__);
 		} else {
 			m_writable = writable;
-			m_readable = m_capacity - m_writable;
+			m_readable = std::max(m_readable, m_capacity - m_writable);
 		}
 	}
 

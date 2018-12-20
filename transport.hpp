@@ -442,10 +442,16 @@ namespace Piper
 	    void finish(Session sid);
 
 			/**
-			 * Reserve space for writing by adjusting the write window. The read
-			 * window will be adjusted automatically as well.
+			 * Adjust the read window. The write window will be adjusted when
+			 * necessary.
 			 */
-			void reserve(unsigned int writable);
+			void set_readable(unsigned int readable);
+
+			/**
+			 * Adjust the write window. The read window will be adjusted when
+			 * necessary.
+			 */
+			void set_writable(unsigned int writable);
 
 			Transport(const Transport& transport) = delete;
 			Transport(Transport&& transport) = delete;
