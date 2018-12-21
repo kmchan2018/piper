@@ -21,7 +21,6 @@
 
 #include "exception.hpp"
 #include "buffer.hpp"
-#include "transfer.hpp"
 #include "file.hpp"
 
 

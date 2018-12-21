@@ -6,7 +6,6 @@
 
 #include "exception.hpp"
 #include "buffer.hpp"
-#include "transfer.hpp"
 
 
 #ifndef FILE_HPP_
