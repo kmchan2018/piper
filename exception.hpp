@@ -56,7 +56,7 @@ namespace Piper
 	/**
 	 * Exception indicating permission error.
 	 */
-	class PermissionException : SystemException
+	class PermissionException : public SystemException
 	{
 		public:
 			using SystemException::SystemException;

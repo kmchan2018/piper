@@ -369,7 +369,7 @@ namespace Piper
 	/**
 	 * Exception thrown when the file reaches its end.
 	 */
-	class EOFException : Exception
+	class EOFException : public Exception
 	{
 		public:
 			using Exception::Exception;
@@ -378,7 +378,7 @@ namespace Piper
 	/**
 	 * Exception thrown when the file reaches its end while extra data is expected.
 	 */
-	class PrematureEOFException : EOFException
+	class PrematureEOFException : public EOFException
 	{
 		public:
 			using EOFException::EOFException;

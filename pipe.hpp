@@ -407,8 +407,10 @@ namespace Piper
 	/**
 	 * Thrown when the format is not supported.
 	 */
-	class UnsupportedFormatException : Exception
+	class UnsupportedFormatException : public Exception
 	{
+		public:
+			using Exception::Exception;
 	}
 #endif
 
