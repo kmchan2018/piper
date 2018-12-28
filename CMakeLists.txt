@@ -10,6 +10,7 @@ set (PIPER_VERSION_PATCH 1)
 
 set (
 	CORE_SOURCES
+	alsa.cpp
 	file.cpp
 	pipe.cpp
 	signpost.cpp
