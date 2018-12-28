@@ -18,10 +18,34 @@
 #include "exception.hpp"
 #include "timestamp.hpp"
 #include "buffer.hpp"
-#include "file.hpp"
 #include "pipe.hpp"
 #include "tokenbucket.hpp"
+#include "device.hpp"
+#include "operation.hpp"
 
+
+/**
+ * Flag for signalling program reload.
+ */
+volatile std::atomic_bool reload;
+
+/**
+ * Flag for signalling program termination.
+ */
+volatile std::atomic_bool quit;
+
+
+/**
+ * Exception for reload signal.
+ */
+class ReloadException : std::exception
+{
+	public:
+		ReloadException(const char* what) : m_what(what) {}
+		const char* what() const noexcept { return m_what; }
+	private:
+		const char* m_what;
+};
 
 /**
  * Exception for quit signal.
@@ -34,27 +58,150 @@ class QuitException : std::exception {
 		const char* m_what;
 };
 
+/**
+ * Custom callback implementation for command line interface.
+ */
+class Callback : public Piper::Callback
+{
+	public:
+
+		/**
+		 * Handle data transfer during the feed/drain operation by doing nothing.
+		 */
+		void on_transfer(const Piper::Preamble& preamble, const Piper::Buffer& buffer) override
+		{
+		}
+
+		/**
+		 * Handle ticks during the feed/drain operation by checking the reload/quit
+		 * flags and throwing appropriate exception.
+		 */
+		void on_tick() override
+		{
+			if (quit == true) {
+				reload = false;
+				quit = false;
+				throw QuitException("program termination due to signal");
+			} else if (reload == true) {
+				reload = false;
+				quit = false;
+				throw ReloadException("program reload due to signal");
+			}
+		}
+
+};
+
 
 /**
- * Flag for signalling program termination.
+ * Signal handler for setting the reload flag.
  */
-volatile std::atomic_bool quit;
-
-/**
- * Handle signals by setting the quit flag.
- */
-void stop(int signum) {
-	std::fprintf(stderr, "INFO: Start program termination due to signal\n\n");
-	quit = true;
+extern "C" void trigger_reload(int signum)
+{
+	reload = true;
 }
 
 /**
- * Check the quit flag and raise quit exception if true.
+ * Signal handler for setting the quit flag.
  */
-void check() {
-	if (quit == true) {
-		throw QuitException("program termination due to signal");
+extern "C" void trigger_quit(int signum)
+{
+	quit = true;
+}
+
+
+/**
+ * Feed pipe from the given device.
+ */
+template<class Device, class ... Parameters> int do_feed(const char* path, Parameters ... args)
+{
+	try {
+		signal(SIGTERM, trigger_quit);
+		signal(SIGINT, trigger_quit);
+		signal(SIGQUIT, trigger_quit);
+		signal(SIGHUP, trigger_reload);
+
+		while (true) {
+			Callback callback;
+			Piper::FeedOperation operation(callback);
+			Piper::Pipe pipe(path);
+			Device input(args...);
+
+			try {
+				while (true) {
+					try {
+						operation.execute(pipe, input);
+					} catch (Piper::CaptureException& ex) {
+						std::fprintf(stderr, "WARN: feed restarted due to capture exception: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
+					}
+				}
+			} catch (ReloadException& ex) {
+				std::fprintf(stderr, "INFO: program reloaded due to signal\n");
+			}
+		}
+	} catch (QuitException& ex) {
+		return 0;
+	} catch (Piper::EOFException& ex) {
+		return 0;
+	} catch (Piper::Exception& ex) {
+		std::fprintf(stderr, "ERROR: cannot feed pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
+		return 3;
+	} catch (std::exception& ex) {
+		std::fprintf(stderr, "ERROR: cannot feed pipe: %s\n\n", ex.what());
+		return 3;
+	} catch (...) {
+		std::fprintf(stderr, "ERROR: cannot feed pipe\n\n");
+		return 3;
 	}
+
+	return 0;
+}
+
+
+/**
+ * Drain pipe to the given device.
+ */
+template<class Device, class ... Parameters> int do_drain(const char* path, Parameters ... args)
+{
+	try {
+		signal(SIGTERM, trigger_quit);
+		signal(SIGINT, trigger_quit);
+		signal(SIGQUIT, trigger_quit);
+		signal(SIGHUP, trigger_reload);
+
+		while (true) {
+			Callback callback;
+			Piper::DrainOperation operation(callback);
+			Piper::Pipe pipe(path);
+			Device output(args...);
+
+			try {
+				while (true) {
+					try {
+						operation.execute(pipe, output);
+					} catch (Piper::DrainDataLossException& ex) {
+						std::fprintf(stderr, "WARN: drain restarted due to pipe buffer overrun: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
+					} catch (Piper::PlaybackException& ex) {
+						std::fprintf(stderr, "WARN: drain restarted due to playback exception: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
+					}
+				}
+			} catch (ReloadException& ex) {
+				std::fprintf(stderr, "INFO: program reloaded due to signal\n");
+			}
+		}
+	} catch (QuitException& ex) {
+		return 0;
+	} catch (Piper::Exception& ex) {
+		std::fprintf(stderr, "ERROR: cannot drain pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
+		return 3;
+	} catch (std::exception& ex) {
+		std::fprintf(stderr, "ERROR: cannot drain pipe: %s\n\n", ex.what());
+		return 3;
+	} catch (...) {
+		std::fprintf(stderr, "ERROR: cannot drain pipe\n\n");
+		return 3;
+	}
+
+	return 0;
 }
 
 
@@ -182,65 +329,24 @@ int info(int argc, char **argv)
 
 
 /**
- * Feed pipe from stdin.
+ * Feed pipe from capture device.
  */
-int feed(int argc, char **argv) {
-	if (argc >= 3) {
-		try {
-			Piper::File input(STDIN_FILENO);
-			Piper::Pipe pipe(argv[2]);
-			Piper::Inlet inlet(pipe);
-			Piper::Inlet::Position cursor(inlet.start());
-			Piper::TokenBucket bucket(10, 1, pipe.period_time());
-
-			quit = false;
-			signal(SIGTERM, stop);
-			signal(SIGINT, stop);
-			signal(SIGQUIT, stop);
-			signal(SIGHUP, stop);
-
-			bucket.start();
-
-			while (quit == false) {
-				try {
-					if (bucket.tokens() == 0) {
-						while (bucket.tokens() == 0) {
-							bucket.try_refill();
-							check();
-						}
-					} else {
-						Piper::Preamble& preamble(inlet.preamble(cursor));
-						Piper::Buffer content(inlet.content(cursor));
-						Piper::Destination destination(content);
-
-						while (destination.remainder() > 0) {
-							input.try_readall(destination);
-							check();
-						}
-
-						preamble.timestamp = Piper::now();
-						inlet.flush();
-						bucket.spend(1);
-						cursor++;
-					}
-				} catch (Piper::EOFException& ex) {
-					break;
-				} catch (QuitException& ex) {
-					break;
-				}
-			}
-
-			return 0;
-		} catch (Piper::Exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot feed pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-			return 3;
-		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot feed pipe: %s\n\n", ex.what());
-			return 3;
-		}
-	} else {
+int feed(int argc, char **argv)
+{
+	if (argc < 3) {
 		std::fprintf(stderr, "ERROR: Missing arguments\n");
-		std::fprintf(stderr, "Usage: %s feed <path>\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s feed <path> [<device>]\n\n", argv[0]);
+		return 1;
+	}
+
+	if (argc == 3) {
+		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "-") == 0) {
+		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
+		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
+	} else {
+		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
 		return 1;
 	}
 }
@@ -249,68 +355,22 @@ int feed(int argc, char **argv) {
 /**
  * Drain pipe to stdout.
  */
-int drain(int argc, char **argv) {
-	if (argc >= 3) {
-		try {
-			Piper::File output(STDOUT_FILENO);
-			Piper::Pipe pipe(argv[2]);
-			Piper::Outlet outlet(pipe);
-			Piper::Outlet::Position cursor(outlet.until());
-			Piper::TokenBucket bucket(10, 1, pipe.period_time());
-
-			quit = false;
-			signal(SIGTERM, stop);
-			signal(SIGINT, stop);
-			signal(SIGQUIT, stop);
-			signal(SIGHUP, stop);
-
-			bucket.start();
-
-			while (quit == false) {
-				try {
-					if (bucket.tokens() == 0) {
-						while (bucket.tokens() == 0) {
-							bucket.try_refill();
-							check();
-						}
-					} else if (outlet.until() == cursor) {
-						while (outlet.until() == cursor) {
-							outlet.watch();
-							check();
-						}
-					} else if (outlet.start() > cursor) {
-						std::fprintf(stderr, "WARNING: discarding old data\n");
-						cursor = outlet.until();
-					} else {
-						const Piper::Buffer content(outlet.content(cursor));
-						Piper::Source source(content);
-
-						while (source.remainder() > 0) {
-							output.try_writeall(source);
-							check();
-						}
-
-						bucket.spend(1);
-						cursor++;
-					}
-				} catch (Piper::EOFException& ex) {
-					break;
-				} catch (QuitException& ex) {
-					break;
-				}
-			}
-
-			return 0;
-		} catch (Piper::Exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot drain pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-			return 3;
-		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot drain pipe: %s\n\n", ex.what());
-			return 3;
-		}
-	} else {
+int drain(int argc, char **argv)
+{
+	if (argc < 3) {
 		std::fprintf(stderr, "ERROR: Missing arguments\n");
-		std::fprintf(stderr, "Usage: %s drain <path>\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s drain <path> [<device>]\n\n", argv[0]);
+		return 1;
+	}
+
+	if (argc == 3) {
+		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "-") == 0) {
+		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
+		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
+	} else {
+		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
 		return 1;
 	}
 }

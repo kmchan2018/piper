@@ -12,6 +12,8 @@ set (
 	CORE_SOURCES
 	alsa.cpp
 	file.cpp
+	device.cpp
+	operation.cpp
 	pipe.cpp
 	signpost.cpp
 	timer.cpp
