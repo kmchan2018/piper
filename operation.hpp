@@ -22,15 +22,35 @@ namespace Piper
 		public:
 
 			/**
+			 * Called when a feed operation begins.
+			 */
+			virtual void on_begin_feed(const Pipe& pipe, const CaptureDevice& device) {}
+
+			/**
+			 * Called when a drain operation begins.
+			 */
+			virtual void on_begin_drain(const Pipe& pipe, const PlaybackDevice& device) {}
+
+			/**
 			 * Called whenever a transfer from/into the pipe occured.
 			 */
-			virtual void on_transfer(const Preamble& preamble, const Buffer& buffer) = 0;
+			virtual void on_transfer(const Preamble& preamble, const Buffer& buffer) {}
 
 			/**
 			 * Called whenever an operation reaches a point where its execution
 			 * can be interrupted.
 			 */
-			virtual void on_tick() = 0;
+			virtual void on_tick() {};
+
+			/**
+			 * Called when the current operation ends.
+			 */
+			virtual void on_end() {}
+
+			/**
+			 * Destruct the callback instance.
+			 */
+			virtual ~Callback() {}
 
 	};
 

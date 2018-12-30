@@ -26,6 +26,7 @@ namespace Piper
 		device.configure(pipe);
 		device.start();
 		bucket.start();
+		m_callback.on_begin_feed(pipe, device);
 
 		try {
 			while (true) {
@@ -50,19 +51,23 @@ namespace Piper
 				}
 			}
 		} catch (Exception& ex) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		} catch (std::exception& ex) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		} catch (...) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		}
 
+		m_callback.on_end();
 		bucket.stop();
 		device.stop();
 	}
@@ -83,6 +88,7 @@ namespace Piper
 			device.configure(pipe, 1);
 			device.start();
 			bucket.start();
+			m_callback.on_begin_drain(pipe, device);
 
 			while (true) {
 				if (bucket.tokens() == 0) {
@@ -109,19 +115,23 @@ namespace Piper
 				}
 			}
 		} catch (Exception& ex) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		} catch (std::exception& ex) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		} catch (...) {
+			m_callback.on_end();
 			bucket.stop();
 			device.stop();
 			throw;
 		}
 
+		m_callback.on_end();
 		bucket.stop();
 		device.stop();
 	}
