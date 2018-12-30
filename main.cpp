@@ -6,6 +6,7 @@
 
 
 #include <atomic>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -66,10 +67,95 @@ class Callback : public Piper::Callback
 	public:
 
 		/**
+		 * Initialize the variables.
+		 */
+		explicit Callback() : m_tracking(false) {}
+
+		/**
+		 * Disable tracking for drain operations.
+		 */
+		void on_begin_feed(const Piper::Pipe& pipe, const Piper::CaptureDevice& device)
+		{
+			m_tracking = false;
+		}
+
+		/**
+		 * Initialize tracking for drain operations.
+		 */
+		void on_begin_drain(const Piper::Pipe& pipe, const Piper::PlaybackDevice& device)
+		{
+			const double period = timestamp(pipe.period_time());
+
+			m_tracking = true;
+			m_alpha = 2.0 / (1000.0 / period + 1.0);
+			m_remainder = 1.0 - m_alpha;
+			m_previous = std::nan("1");
+			m_source_delay_expectation = period;
+			m_source_delay_average = std::nan("1");
+			m_source_delay_max = std::nan("1");
+			m_source_jitter_average = std::nan("1");
+			m_source_jitter_max = std::nan("1");
+			m_pipe_delay_expectation = period / 2.0;
+			m_pipe_delay_average = std::nan("1");
+			m_pipe_delay_max = std::nan("1");
+			m_pipe_jitter_average = std::nan("1");
+			m_pipe_jitter_max = std::nan("1");
+		}
+
+		/**
 		 * Handle data transfer during the feed/drain operation by doing nothing.
 		 */
 		void on_transfer(const Piper::Preamble& preamble, const Piper::Buffer& buffer) override
 		{
+			if (m_tracking) {
+				const double now = timestamp(Piper::now());
+				const double current = timestamp(preamble.timestamp);
+				const double previous = m_previous;
+
+				m_previous = current;
+
+				const double pipe_delay = now - current;
+				const double pipe_jitter = abs(pipe_delay - m_pipe_delay_expectation);
+
+				if (pipe_delay < 10000.0) {
+					if (std::isnan(m_pipe_delay_average) == false) {
+						m_pipe_delay_average = m_alpha * pipe_delay + m_remainder * m_pipe_delay_average;
+						m_pipe_delay_max = std::max(pipe_delay, m_pipe_delay_max);
+						m_pipe_jitter_average = m_alpha * pipe_jitter + m_remainder * m_pipe_jitter_average;
+						m_pipe_jitter_max = std::max(pipe_jitter, m_pipe_jitter_max);
+					} else {
+						m_pipe_delay_average = pipe_delay;
+						m_pipe_delay_max = pipe_delay;
+						m_pipe_jitter_average = pipe_jitter;
+						m_pipe_jitter_max = pipe_jitter;
+					}
+				}
+
+				if (std::isnan(previous) == false) {
+					const double source_delay = current - previous;
+					const double source_jitter = abs(source_delay - m_source_delay_expectation);
+
+					if (source_delay < 10000.0) {
+						if (std::isnan(m_source_delay_average) == false) {
+							m_source_delay_average = m_alpha * source_delay + m_remainder * m_source_delay_average;
+							m_source_delay_max = std::max(source_delay, m_source_delay_max);
+							m_source_jitter_average = m_alpha * source_jitter + m_remainder * m_source_jitter_average;
+							m_source_jitter_max = std::max(source_jitter, m_source_jitter_max);
+						} else {
+							m_source_delay_average = source_delay;
+							m_source_delay_max = source_delay;
+							m_source_jitter_average = source_jitter;
+							m_source_jitter_max = source_jitter;
+						}
+					}
+				}
+
+				std::fprintf(stderr, "\x1b[2K\x1b[1GDEBUG: source: delay=(%5.3f, %5.3f), jitter=(%5.3f, %5.3f), pipe: delay=(%5.3f, %5.3f), jitter=(%5.3f, %5.3f)",
+					m_source_delay_average, m_source_delay_max,
+					m_source_jitter_average, m_source_jitter_max,
+					m_pipe_delay_average, m_pipe_delay_max,
+					m_pipe_jitter_average, m_pipe_jitter_max);
+			}
 		}
 
 		/**
@@ -88,6 +174,31 @@ class Callback : public Piper::Callback
 				throw ReloadException("program reload due to signal");
 			}
 		}
+
+	private:
+
+		/**
+		 * Convert timestamps to microsecond floats.
+		 */
+		double timestamp(Piper::Timestamp timestamp)
+		{
+			return double(timestamp) / 1000000.0;
+		}
+
+		bool m_tracking;
+		double m_alpha;
+		double m_remainder;
+		double m_previous;
+		double m_source_delay_expectation;
+		double m_source_delay_average;
+		double m_source_delay_max;
+		double m_source_jitter_average;
+		double m_source_jitter_max;
+		double m_pipe_delay_expectation;
+		double m_pipe_delay_average;
+		double m_pipe_delay_max;
+		double m_pipe_jitter_average;
+		double m_pipe_jitter_max;
 
 };
 
