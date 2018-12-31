@@ -456,6 +456,10 @@ int feed(int argc, char **argv)
 		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
 	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
 		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "alsa") == 0) {
+		return do_feed<Piper::AlsaCaptureDevice>(argv[2], "default");
+	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
+		return do_feed<Piper::AlsaCaptureDevice>(argv[2], argv[3] + 5);
 	} else {
 		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
 		return 1;
@@ -480,6 +484,10 @@ int drain(int argc, char **argv)
 		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
 	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
 		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
+	} else if (argc == 4 && strcmp(argv[3], "alsa") == 0) {
+		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], "default");
+	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
+		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], argv[3] + 5);
 	} else {
 		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
 		return 1;
