@@ -1,6 +1,7 @@
 
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -8,7 +9,9 @@
 #include <cstring>
 #include <stdexcept>
 #include <memory>
+#include <mutex>
 #include <system_error>
+#include <thread>
 #include <utility>
 
 #include "alsa.hpp"
@@ -27,6 +30,15 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 	public:
 
 		/**
+		 * Enum for thread status. The pump thread should check the flag every so
+		 * often to determine actions it need to take apart from the check. IDLE
+		 * indicates that the pump thread should do nothing else; ACTIVE indicates
+		 * that the pump thread should periodically flush blocks down the pipe; END
+		 * indicates that the pump thread should end.
+		 */
+		enum class Status { IDLE = 0, ACTIVE = 1, END = 2 };
+
+		/**
 		 * Construct a new piper playback handler.
 		 */
 		PiperPlaybackHandler(const char* path) :
@@ -34,8 +46,12 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			m_inlet(m_pipe),
 			m_timer(m_pipe.period_time()),
 			m_signpost(),
+			m_expirations(0),
 			m_transfer_source(m_pipe.format_code_alsa(), m_pipe.channels()),
-			m_transfer_target(m_pipe.format_code_alsa(), m_pipe.channels())
+			m_transfer_target(m_pipe.format_code_alsa(), m_pipe.channels()),
+			m_status(Status::IDLE),
+			m_mutex(),
+			m_pump(&PiperPlaybackHandler::pump, this)
 		{
 			// do nothing
 		}
@@ -45,6 +61,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 */
 		void configure(const char* name, snd_pcm_stream_t stream, int mode, ALSA::IOPlug::Options& options)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			options.name = name;
 			options.enable_prepare_callback = true;
 			options.enable_poll_descriptors_count_callback = true;
@@ -58,6 +76,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 */
 		void create(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			unsigned int access_list[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
 			unsigned int format_list[] = { static_cast<unsigned int>(m_pipe.format_code_alsa()) };
 			unsigned int channels_list[] = { m_pipe.channels() };
@@ -77,11 +97,25 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * PREPARED state. At this point, the device should have an empty buffer
 		 * and hence it should be able to receive audio data from the application.
 		 *
- 		 * This callback will activate the signpost to report that the device can
-		 * be written to.
+		 * First of all, this callback will reset the status to IDLE to ensure
+		 * that the pump thread will not continue to flush blocks down the pipe.
+		 * It makes sure that audio data written into the device will not be
+		 * played before the playback starts.
+		 *
+		 * Additionally, this callback will also reset the expiration count to
+		 * zero. At this point, the device hardware pointer will reset. The action
+		 * will ensure that the new hardware pointer will align with the first
+		 * writable blocks of the pipe.
+		 *
+ 		 * Finally, this callback will activate the signpost to report that
+		 * the device can be written to.
 		 */
 		void prepare(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
+			m_status = Status::IDLE;
+			m_expirations = 0;
 			m_signpost.activate();
 		}
 
@@ -90,12 +124,15 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * RUNNING state. In this state, the device should periodically deliver
 		 * audio data in the device buffer into the pipe.
 		 *
-		 * This callback will start the timer to signal possible hardware pointer
-		 * updates every period. The application will then handle the signals and
-		 * deliver audio data via the pointer callback.
+		 * This callback will update status to ACTIVE and start the timer. It 
+		 * ensure that the pump thread will watch the timer and periodically
+		 * flush blocks into the pipe.
 		 */
 		void start(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
+			m_status = Status::ACTIVE;
 			m_timer.start();
 		}
 
@@ -104,13 +141,20 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * willreturn to SETUP state, and should stop accepting audio data nor
 		 * delivering them into the pipe.
 		 *
-		 * This callback will stop the timer and deactivate the signpost to
-		 * reflect the situation.
+		 * This callback will reset the status back to IDLE and stop the timer.
+		 * It ensures that audio data will no longer be flushed into the pipe.
+		 * 
+		 * Additionally, this callback will deactivate the signpost to reflect
+		 * the fact that the device is no longer accepting audio data.
 		 */
 		void stop(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			m_timer.stop();
 			m_signpost.deactivate();
+			m_expirations = 0;
+			m_status = Status::IDLE;
 		}
 
 		/**
@@ -125,6 +169,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 */
 		int poll_descriptors_count(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
 			return 2;
 		}
 
@@ -136,6 +181,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		{
 			assert(pfd != nullptr);
 			assert(space >= 2);
+
+			std::lock_guard<std::mutex> guard(m_mutex);
 
 			pfd[0].fd = m_timer.descriptor();
 			pfd[0].events = POLLIN;
@@ -160,6 +207,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			assert(revents != nullptr);
 			assert(nfds >= 2);
 
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			for (unsigned int i = 0; i < nfds; i++) {
 				unsigned short temp = pfd[i].revents;
 
@@ -178,45 +227,40 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * the device is in PREPARED or RUNNING state to check the position of
 		 * hardware pointer.
 		 *
-		 * This callback will deliver audio data into the pipe and return back the
-		 * updated hardware pointer. It will also detect possible xrun and handle
-		 * it as well. The process involves:
+		 * First of all, this callback will retrieve the buffer usage according to
+		 * the current hardware pointer, plus the number of frames flushed by the
+		 * pump thread but unaccounted for by the current hardware pointer.
 		 *
-		 * 1. Check the device for amount of data available for delivery.
-		 * 2. Check the timer for amount of data that should be delivered.
-		 * 3. Report buffer underrun if insufficient data is available.
-		 * 4. Timestamp of relevant writable blocks in the pipe and flush them.
-		 * 5. Activate the signpost if data is delivered and new space is vacated.
-		 * 6. Activate the signpost if space is already available.
-		 * 7. Deactivate the signpost otherwise.
-		 * 8. Calculate the new hardware pointer and return it.
+		 * If the buffer usage is less than the flushed frame, the pump thread
+		 * should have pumped past the current application pointer and buffer
+		 * underrun occured. In such case, stop the playback and report the error.
+		 *
+		 * If everything is OK, the callback will take a few actions. It should
+		 * reset the expiration count to zero since the hardware pointer and the
+		 * first writable block of the pipe should once again align. Also, the
+		 * signpost should be updated to reflect if there are space in the device
+		 * buffer. And finally, the new hardware pointer is calculated and returned.
 		 */
 		snd_pcm_uframes_t pointer(ALSA::IOPlug& ioplug)
 		{
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			const snd_pcm_uframes_t period = ioplug.period_size();
 			const snd_pcm_uframes_t used = ioplug.buffer_used();
-			const snd_pcm_uframes_t free = ioplug.buffer_free();
+			const snd_pcm_uframes_t flushed = m_expirations * period;
 
-			m_timer.try_accumulate(0);
+			m_expirations = 0;
 
-			const unsigned int available = used / period;
-			const unsigned int outstanding = m_timer.consume();
-
-			if (outstanding > available) {
+			if (used < flushed) {
+				SNDERR("device cannot be polled: underrun");
 				m_timer.stop();
 				m_signpost.deactivate();
+				m_expirations = 0;
+				m_status = Status::IDLE;
 				throw ALSA::XrunException();
 			}
 
-			const Piper::Inlet::Position start = m_inlet.start();
-			const Piper::Inlet::Position until = start + outstanding;
-
-			for (Piper::Inlet::Position position = start; position < until; position++) {
-				m_inlet.preamble(position).timestamp = Piper::now();
-				m_inlet.flush();
-			}
-
-			if (outstanding > 0) {
+			if (flushed > 0) {
 				m_signpost.activate();
 			} else if (free > 0) {
 				m_signpost.activate();
@@ -226,37 +270,68 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 
 			const snd_pcm_uframes_t boundary = ioplug.boundary();
 			const snd_pcm_uframes_t current_pointer = ioplug.hardware_pointer();
-			const snd_pcm_uframes_t next_pointer = (current_pointer + outstanding * period) % boundary;
+			const snd_pcm_uframes_t next_pointer = (current_pointer + flushed) % boundary;
 			return next_pointer;
 		}
 
 		/**
-		 * Transfer data into the writable block of the pipe.
+		 * Transfer data into the device buffer starting at the current application
+		 * pointer.
+		 *
+		 * First of all, this callback will retrieve the buffer usage according to
+		 * the current hardware pointer, plus the number of frames flushed by the
+		 * pump thread but unaccounted for by the current hardware pointer.
+		 *
+		 * If the buffer usage is less than the flushed frame, the pump thread
+		 * should have pumped past the current application pointer and buffer
+		 * underrun occured. In such case, stop the playback and report the error.
+		 *
+		 * After that, this callback will calculate the position of writable block
+		 * corresponding to the current application pointer. It will also restrict
+		 * the amount of data to be copied should the buffer has limited space.
+		 * After that, the audio data is copied.
+		 *
+		 * Before returning, the signpost should be updated to reflect the amount
+		 * of free space still available for transfer.
+		 *
+		 * Finally, the amount of data copied is returned.
 		 */
 		snd_pcm_uframes_t transfer(ALSA::IOPlug& ioplug, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
 		{
 			assert(areas != nullptr);
 			assert(size > 0);
 
+			std::lock_guard<std::mutex> guard(m_mutex);
+
 			const snd_pcm_uframes_t period = ioplug.period_size();
 			const snd_pcm_uframes_t used = ioplug.buffer_used();
 			const snd_pcm_uframes_t free = ioplug.buffer_free();
+			const snd_pcm_uframes_t flushed = m_expirations * period;
+
+			if (used < flushed) {
+				SNDERR("device cannot be written: underrun");
+				m_timer.stop();
+				m_signpost.deactivate();
+				m_expirations = 0;
+				m_status = Status::IDLE;
+				throw ALSA::XrunException();
+			}
 
 			Piper::Inlet::Position increment = used / period;
-			Piper::Inlet::Position block = m_inlet.start() + increment;
+			Piper::Inlet::Position block = m_inlet.start() - m_expirations + increment;
 			Piper::Buffer buffer = m_inlet.content(block);
 			snd_pcm_uframes_t pending = size;
 			snd_pcm_uframes_t done = 0;
-
-			m_transfer_source.reset(areas, offset + size);
-			m_transfer_target.reset(buffer.start(), buffer.size());
-			m_transfer_source.behead(offset);
-			m_transfer_target.behead(used - increment * period);
 
 			if (pending > free) {
 				SNDERR("device cannot be written: insufficient space (%lu) for incoming data (%lu)", free, size);
 				pending = free;
 			}
+
+			m_transfer_source.reset(areas, offset + size);
+			m_transfer_target.reset(buffer.start(), buffer.size());
+			m_transfer_source.behead(offset);
+			m_transfer_target.behead(used - increment * period);
 
 			assert(m_transfer_source.valid());
 			assert(m_transfer_target.valid());
@@ -286,14 +361,79 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			return done;
 		}
 
+		/**
+		 * Pump thread should periodically check the status and pump blocks down
+		 * the pipe when active.
+		 *
+		 * Logically, the thread should check the current status in a loop. When
+		 ( the status is END, the thread should end the loop and return. When the
+		 * status is IDLE, the thread should wait for a short interval in the loop
+		 * body; when the status is ACTIVE, the thread should poll the timer for
+		 * for updates with a fixed timeout, and if the timer fires the thread
+		 * should flush blocks down the pipe.
+		 *
+		 * In practice, the loop is implemented differently but gives the same
+		 * behavior. The timer is polled for updates in the loop with timeout
+		 * when the status is IDLE or ACTIVE - that means both statuses uses the
+		 * same code path for waiting. Also note that the timer descriptor and
+		 * pipe period are read and polled without locking: these are logically
+		 * immutable throughout the device lifetime and therefore should not 
+		 * cause thread-safety issues.
+		 */
+		void pump()
+		{
+			int descriptor = m_timer.descriptor();
+			int timeout = m_pipe.period_time() / 1000000L;
+
+			struct pollfd pfd;
+			pfd.fd = descriptor;
+			pfd.events = POLLIN;
+			pfd.revents = 0;
+
+			while (m_status != Status::END) {
+				if (::poll(&pfd, 1, timeout) > 0 && (pfd.revents & POLLIN) > 0) {
+					if (m_status == Status::ACTIVE) {
+						std::lock_guard<std::mutex> guard(m_mutex);
+
+						m_timer.try_accumulate(0);
+
+						const unsigned int outstanding = m_timer.consume();
+						const Piper::Inlet::Position start = m_inlet.start();
+						const Piper::Inlet::Position until = start + outstanding;
+
+						m_expirations += outstanding;
+
+						for (Piper::Inlet::Position position = start; position < until; position++) {
+							m_inlet.preamble(position).timestamp = Piper::now();
+							m_inlet.flush();
+						}
+					}
+				}
+			}
+		}
+
+		/**
+		 * Close the device. This callback will update the status to END and wait
+		 * until the pump thread finishes.
+		 */
+		void close(ALSA::IOPlug& ioplug)
+		{
+			m_status = Status::END;
+			m_pump.join();
+		}
+
 	private:
 
 		Piper::Pipe m_pipe;
 		Piper::Inlet m_inlet;
 		Piper::Timer m_timer;
 		Piper::SignPost m_signpost;
+		Piper::Inlet::Position m_expirations;
 		ALSA::Range m_transfer_source;
 		ALSA::Range m_transfer_target;
+		std::atomic<Status> m_status;
+		std::mutex m_mutex;
+		std::thread m_pump;
 
 };
 
