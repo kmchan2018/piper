@@ -46,6 +46,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			m_inlet(m_pipe),
 			m_timer(m_pipe.period_time()),
 			m_signpost(),
+			m_buffer(0),
 			m_expirations(0),
 			m_transfer_source(m_pipe.format_code_alsa(), m_pipe.channels()),
 			m_transfer_target(m_pipe.format_code_alsa(), m_pipe.channels()),
@@ -107,6 +108,12 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * will ensure that the new hardware pointer will align with the first
 		 * writable blocks of the pipe.
 		 *
+		 * Next, the buffer should be cleared. As blocks are flushed to the pipe
+		 * continuously by the pump thread, an underrunning playback device may
+		 * deliver stale data until one of the callback is invoked and idling the
+		 * pump thread. Clearing the buffer prevents flushing down stale data as
+		 * if they are new.
+		 *
  		 * Finally, this callback will activate the signpost to report that
 		 * the device can be written to.
 		 */
@@ -115,8 +122,17 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			std::lock_guard<std::mutex> guard(m_mutex);
 
 			m_status = Status::IDLE;
+			m_buffer = ioplug.buffer_size() / ioplug.period_size();
 			m_expirations = 0;
 			m_signpost.activate();
+
+			const Piper::Inlet::Position clear_start = m_inlet.start();
+			const Piper::Inlet::Position clear_until = clear_start + m_buffer;
+
+			for (Piper::Inlet::Position position = clear_start; position < clear_until; position++) {
+				Piper::Buffer buffer = m_inlet.content(position);
+				std::memset(buffer.start(), 0, buffer.size());
+			}
 		}
 
 		/**
@@ -154,6 +170,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			m_timer.stop();
 			m_signpost.deactivate();
 			m_expirations = 0;
+			m_buffer = 0;
 			m_status = Status::IDLE;
 		}
 
@@ -170,7 +187,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		int poll_descriptors_count(ALSA::IOPlug& ioplug)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
-			return 2;
+			return 1;
 		}
 
 		/**
@@ -180,18 +197,15 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		int poll_descriptors(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int space)
 		{
 			assert(pfd != nullptr);
-			assert(space >= 2);
+			assert(space >= 1);
 
 			std::lock_guard<std::mutex> guard(m_mutex);
 
-			pfd[0].fd = m_timer.descriptor();
+			pfd[0].fd = m_signpost.descriptor();
 			pfd[0].events = POLLIN;
 			pfd[0].revents = 0;
-			pfd[1].fd = m_signpost.descriptor();
-			pfd[1].events = POLLIN;
-			pfd[1].revents = 0;
 
-			return 2;
+			return 1;
 		}
 
 		/**
@@ -205,7 +219,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		{
 			assert(pfd != nullptr);
 			assert(revents != nullptr);
-			assert(nfds >= 2);
+			assert(nfds >= 1);
 
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -237,9 +251,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 *
 		 * If everything is OK, the callback will take a few actions. It should
 		 * reset the expiration count to zero since the hardware pointer and the
-		 * first writable block of the pipe should once again align. Also, the
-		 * signpost should be updated to reflect if there are space in the device
-		 * buffer. And finally, the new hardware pointer is calculated and returned.
+		 * first writable block of the pipe should once again align.
 		 */
 		snd_pcm_uframes_t pointer(ALSA::IOPlug& ioplug)
 		{
@@ -256,16 +268,9 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 				m_timer.stop();
 				m_signpost.deactivate();
 				m_expirations = 0;
+				m_buffer = 0;
 				m_status = Status::IDLE;
 				throw ALSA::XrunException();
-			}
-
-			if (flushed > 0) {
-				m_signpost.activate();
-			} else if (free > 0) {
-				m_signpost.activate();
-			} else {
-				m_signpost.deactivate();
 			}
 
 			const snd_pcm_uframes_t boundary = ioplug.boundary();
@@ -313,6 +318,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 				m_timer.stop();
 				m_signpost.deactivate();
 				m_expirations = 0;
+				m_buffer = 0;
 				m_status = Status::IDLE;
 				throw ALSA::XrunException();
 			}
@@ -350,12 +356,10 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 				pending -= copied;
 			}
 
-			if (free == 0) {
-				m_signpost.deactivate();
-			} else if (free == done) {
-				m_signpost.deactivate();
-			} else {
+			if (free + flushed - done > 0) {
 				m_signpost.activate();
+			} else {
+				m_signpost.deactivate();
 			}
 
 			return done;
@@ -370,7 +374,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * status is IDLE, the thread should wait for a short interval in the loop
 		 * body; when the status is ACTIVE, the thread should poll the timer for
 		 * for updates with a fixed timeout, and if the timer fires the thread
-		 * should flush blocks down the pipe.
+		 * should flush blocks down the pipe. Along with the flush, signpost should
+		 * be activated to indicate free space for new audio data.
 		 *
 		 * In practice, the loop is implemented differently but gives the same
 		 * behavior. The timer is polled for updates in the loop with timeout
@@ -379,6 +384,10 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * pipe period are read and polled without locking: these are logically
 		 * immutable throughout the device lifetime and therefore should not 
 		 * cause thread-safety issues.
+		 *
+		 * Also, note that new writable blocks from the pipe are cleared. The
+		 * reason is already outlined in the prepare method, so it is not
+		 * repeated here.
 		 */
 		void pump()
 		{
@@ -398,14 +407,25 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 						m_timer.try_accumulate(0);
 
 						const unsigned int outstanding = m_timer.consume();
-						const Piper::Inlet::Position start = m_inlet.start();
-						const Piper::Inlet::Position until = start + outstanding;
+						const Piper::Inlet::Position flush_start = m_inlet.start();
+						const Piper::Inlet::Position flush_until = flush_start + outstanding;
+						const Piper::Inlet::Position clear_start = m_inlet.start() + m_buffer;
+						const Piper::Inlet::Position clear_until = clear_start + outstanding;
+
+						for (Piper::Inlet::Position position = flush_start; position < flush_until; position++) {
+							m_inlet.preamble(position).timestamp = Piper::now();
+							m_inlet.flush();
+						}
+
+						for (Piper::Inlet::Position position = clear_start; position < clear_until; position++) {
+							Piper::Buffer buffer = m_inlet.content(position);
+							std::memset(buffer.start(), 0, buffer.size());
+						}
 
 						m_expirations += outstanding;
 
-						for (Piper::Inlet::Position position = start; position < until; position++) {
-							m_inlet.preamble(position).timestamp = Piper::now();
-							m_inlet.flush();
+						if (outstanding > 0) {
+							m_signpost.activate();
 						}
 					}
 				}
@@ -428,6 +448,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		Piper::Inlet m_inlet;
 		Piper::Timer m_timer;
 		Piper::SignPost m_signpost;
+		Piper::Inlet::Position m_buffer;
 		Piper::Inlet::Position m_expirations;
 		ALSA::Range m_transfer_source;
 		ALSA::Range m_transfer_target;
