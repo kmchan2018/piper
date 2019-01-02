@@ -58,7 +58,7 @@ namespace Piper
 			/**
 			 * Return the timer of the token bucket.
 			 */
-			const Timer& descriptor() const noexcept { return m_timer; }
+			const Timer& timer() const noexcept { return m_timer; }
 
 			/**
 			 * Return the amount of tokens the token bucket can hold.
