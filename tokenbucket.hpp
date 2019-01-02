@@ -15,6 +15,9 @@ namespace Piper
 	/**
 	 * A token bucket is an algorithm for flow control and traffic shaping.
 	 * 
+	 * Overview
+	 * ========
+	 *
 	 * The idea behind a token bucket is that data traffic is coupled with
 	 * consumption of tokens in a bucket and by controlling the refilling of
 	 * tokens into the bucket one can control the data traffic.
@@ -29,8 +32,18 @@ namespace Piper
 	 * refill operation, and the `period` parameter controls the time period
 	 * between refills in microseconds.
 	 *
-	 * Another thing of note is that this implementation uses Linux specific
-	 * timerfd API to implement the internal timer.
+	 * Implementation Details
+	 * ======================
+	 *
+	 * This implementation is backed by the timer class found in timer.hpp and
+	 * timer.cpp, by turning accumulated ticks into tokens in the bucket.
+	 *
+	 * Issues
+	 * ======
+	 *
+	 * Due to its use of the timer class, this class is also restricted to
+	 * Linux only.
+	 *
 	 */
 	class TokenBucket
 	{
@@ -117,9 +130,28 @@ namespace Piper
 			TokenBucket& operator=(TokenBucket&& bucket) = delete;
 
 		private:
+
+			/**
+			 * Timer backing the token bucket. The period of this bucket equals to
+			 * the period of the backing timer.
+			 */
 			Timer m_timer;
+
+			/**
+			 * Capacity of the token bucket aka the maximum number of tokens allowed
+			 * in the bucket.
+			 */
 			unsigned int m_capacity;
+
+			/**
+			 * Number of tokens to be replenished for each elapsed period.
+			 */
 			unsigned int m_fill;
+
+			/**
+			 * The current number of tokens in the bucket. It is bounded between 0
+			 * and capacity.
+			 */
 			unsigned int m_tokens;
 	};
 
