@@ -23,15 +23,79 @@
 
 
 /**
- * This class handles the callbacks of piper plugin over playback stream.
+ * This class implements a ALSA PCM playback device that writes audio data to
+ * the specified pipe file.
+ *
+ * Overview
+ * ========
+ *
+ * The playback device created from this class will accept only audio data
+ * matching the pipe file specification, including channel count, sample
+ * format and period size. As for buffer size, the device will accept any
+ * buffer size up to the pipe write window.
+ *
+ * For the software parameters, the device will honor the specified start
+ * threshold. However, both avail_min and period_event are ignored, and the
+ * device will behave as if avail_min is set to 1 and period_event is set to
+ * enable - it means that the device descriptor will be writable whenever
+ * space is available in the device buffer.
+ *
+ * The device will spawn a new thread when it is opened. The thread is
+ * responsible for flusing blocks into the pipe every period. The thread
+ * will be stopped when the device is closed.
+ *
+ * Design Rationale
+ * ================
+ *
+ * The use of thread in the class requires some explanation. Without the
+ * pump thread, one can flush block in the pointer callback, but the flush
+ * rate is now controlled by the client. For some clients, it can lead to
+ * high jitter in the pipe data transfer which can cause trouble on the
+ * drainer side.
+ *
+ * Implementation Details
+ * ======================
+ *
+ * The device is implemented as an ALSA IOPlug device using the API defined
+ * in alsa.hpp and alsa.cpp. This class extends the Handler class and
+ * implement the required callbacks to handle device operations from the
+ * clients. See the comments on each methods for more information.
+ *
+ * The class expects a few invariants to be upheld. Some of them are not
+ * obvious and therefore should be documented here for reference:
+ *
+ * The first invariant is that the first writable block of the pipe should
+ * correspond to the device hardware pointer plus `m_expiration` periods
+ * while the device is in the PREPARED or RUNNING state. The invariant is
+ * essential for data transfer and violation can cause corruption of audio
+ * data.
+ *
+ * The next invariant is that the buffer size stored in the class should
+ * match the real device buffer of the class. The size stored in the class
+ * is used to silence new writable blocks in the pipe. Violation of the
+ * invariant can cause intermittent silence in the drainer side.
+ *
+ * Another invariant is that the timer should have the same period as the
+ * pipe. The timer controls block flushes. Violation of the invariant can
+ * cause buffer underrun of the client as well as timing issue in the drainer
+ * side.
+ *
+ * Last but not least, the signpost should be activated when the device
+ * buffer has free space, deactivated otherwise. The signpost is polled by
+ * some clients to schedule audio data delivery, so violation of the invariant
+ * may prevent some clients from writing audio data to the device. It should
+ * also be noted that this invariant means that every period the signpost will
+ * be activated because the pump thread will flush blocks into the pipe and
+ * creates free space in the device buffer.
+ *
  */
 class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 {
 	public:
 
 		/**
-		 * Enum for thread status. The pump thread should check the flag every so
-		 * often to determine actions it need to take apart from the check. IDLE
+		 * Enum for pump thread status. The pump thread will check the flag every
+		 * so often to determine actions it need to take apart from the check. IDLE
 		 * indicates that the pump thread should do nothing else; ACTIVE indicates
 		 * that the pump thread should periodically flush blocks down the pipe; END
 		 * indicates that the pump thread should end.
@@ -65,6 +129,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			std::lock_guard<std::mutex> guard(m_mutex);
 
 			options.name = name;
+			options.poll_fd = m_signpost.descriptor();
+			options.poll_events = POLLIN;
 			options.enable_prepare_callback = true;
 			options.enable_poll_descriptors_count_callback = true;
 			options.enable_poll_descriptors_callback = true;
@@ -73,7 +139,9 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		}
 
 		/**
-		 * Limits the hardware parameter the playback device accepts.
+		 * Limits the hardware parameter the playback device accepts. The method
+		 * will extract the audio data specification from the pipe and enforce
+		 * them on the device.
 		 */
 		void create(ALSA::IOPlug& ioplug)
 		{
@@ -154,7 +222,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 
 		/**
 		 * Stop the playback in the playback device. After this call, the device
-		 * willreturn to SETUP state, and should stop accepting audio data nor
+		 * will return to SETUP state, and should stop accepting audio data nor
 		 * delivering them into the pipe.
 		 *
 		 * This callback will reset the status back to IDLE and stop the timer.
@@ -176,13 +244,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 
 		/**
 		 * Return the number of descriptors that should be polled by the client
-		 * for device events.
-		 *
-		 * This callback will return 2 for descriptors from both timer and signpost.
-		 * The timer descriptor is responsible for signalling each lapse of period
-		 * and possible hardware pointer changes; on the other hand, the signpost
-		 * descriptor is responsible for advertising availability of space in the
-		 * device buffer and hence opportunities of non-blocking writes.
+		 * for device events. This callback will return 1 for signpost descriptor.
 		 */
 		int poll_descriptors_count(ALSA::IOPlug& ioplug)
 		{
@@ -211,9 +273,8 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		/**
 		 * Check the poll result and return the device events. Note that the
 		 * callback will demangle the event code and translate POLLIN events to
-		 * POLLOUT events. It is because both timer and signpost descriptors can
-		 * only be polled for POLLIN events but the application expects POLLOUT
-		 * events.
+		 * POLLOUT events. It is because signpost descriptor can only be polled
+		 * for POLLIN events but the application expects POLLOUT events.
 		 */
 		void poll_revents(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 		{
@@ -370,7 +431,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * the pipe when active.
 		 *
 		 * Logically, the thread should check the current status in a loop. When
-		 ( the status is END, the thread should end the loop and return. When the
+		 * the status is END, the thread should end the loop and return. When the
 		 * status is IDLE, the thread should wait for a short interval in the loop
 		 * body; when the status is ACTIVE, the thread should poll the timer for
 		 * for updates with a fixed timeout, and if the timer fires the thread
@@ -444,23 +505,121 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 
 	private:
 
+		/**
+		 * Pipe where data is written to.
+		 */
 		Piper::Pipe m_pipe;
+
+		/**
+		 * Inlet where data is written to. Note that creating an inlet over a pipe
+		 * will lock the pipe and blocking other inlets over the same pipe in the
+		 * whole system.
+		 */
 		Piper::Inlet m_inlet;
+
+		/**
+		 * Timer for triggering periodic block flushes. Its period should be the
+		 * same as the pipe period.
+		 */
 		Piper::Timer m_timer;
+
+		/**
+		 * Signpost for reporting device availability. It should be activated when
+		 * there are space in the device buffer for writing, deactivated otherwise.
+		 */
 		Piper::SignPost m_signpost;
+
+		/**
+		 * Size of the playback device buffer in periods. It is used to determine
+		 * new writable pipe blocks that have to be cleared.
+		 */
 		Piper::Inlet::Position m_buffer;
+
+		/**
+		 * Number of periods flushed into the pipe that are not yet acknowledged
+		 * in the hardware pointer. It is used to calculate hardware pointer updates
+		 * as well as to translate application pointers to corresponding pipe
+		 * positions.
+		 */
 		Piper::Inlet::Position m_expirations;
+
+		/**
+		 * ALSA range where data is transferred from. It helps with data copy in
+		 * the transfer method.
+		 */
 		ALSA::Range m_transfer_source;
+
+		/**
+		 * ALSA range where data is transferred to. It helps with data copy in
+		 * the transfer callback.
+		 */
 		ALSA::Range m_transfer_target;
+
+		/**
+		 * Status of the pump thread. It is atomic to ensure that the status
+		 * can be checked without locking.
+		 */
 		std::atomic<Status> m_status;
+
+		/**
+		 * Mutex to ensure that only a single thread (either the client thread
+		 * or the pump thread) can access the internals.
+		 */
 		std::mutex m_mutex;
+
+		/**
+		 * Handle to the pump thread which can be used to control it.
+		 */
 		std::thread m_pump;
 
 };
 
 
 /**
- * This class handles the callbacks of piper plugin over capture stream.
+ * This class implements a ALSA PCM IOPlug device that reads audio data from
+ * the specified pipe file.
+ *
+ * Overview
+ * ========
+ *
+ * The capture device created from this class will return only audio data
+ * matching the pipe file specification, including channel count, sample
+ * format and period size. As for buffer size, the device will accept any
+ * buffer size up to the pipe read window.
+ *
+ * For the software parameters, the device will ignore both avail_min and
+ * period_event, and the device will behave as if avail_min is set to 1
+ * and period_event is set to enable - it means that the device descriptors
+ * will be readable whenever data is available in the device buffer.
+ *
+ * Unlike the playback counterpart, this device will not spawn new thread.
+ *
+ * Implementation Details
+ * ======================
+ *
+ * The device is implemented as an ALSA IOPlug device using the API defined
+ * in alsa.hpp and alsa.cpp. This class extends the Handler class and
+ * implement the required callbacks to handle device operations from the
+ * clients. See the comments on each methods for more information.
+ *
+ * The class expects a few invariants to be upheld. Some of them are not
+ * obvious and therefore should be documented here for reference:
+ *
+ * The first invariant is that the current hardware pointer should align
+ * with the cursor stored in the class. The invariant is used to position
+ * reads and, violation will lead to corrupted audio data.
+ *
+ * Another invariant is that the timer should have the same period as the
+ * pipe. The timer alerts the client of elapsed period and possible arrival
+ * of audio data. Violation of the invariant can cause buffer overrun of the
+ * client.
+ *
+ * Last but not least, the signpost should be activated when the device
+ * buffer has pending data, deactivated otherwise. The signpost is polled
+ * by some clients to schedule audio data retrieval, so violation of the
+ * may prevent some clients from reading audio data from the device. Unlike
+ * the playback counterpart, the signpost is not activated every period.
+ *
  */
 class PiperCaptureHandler : public ALSA::IOPlug::Handler
 {
@@ -474,9 +633,9 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 			m_outlet(m_pipe),
 			m_timer(m_pipe.period_time()),
 			m_signpost(),
+			m_cursor(m_outlet.until()),
 			m_transfer_source(m_pipe.format_code_alsa(), m_pipe.channels()),
-			m_transfer_target(m_pipe.format_code_alsa(), m_pipe.channels()),
-			m_cursor(m_outlet.until())
+			m_transfer_target(m_pipe.format_code_alsa(), m_pipe.channels())
 		{
 			// do nothing
 		}
@@ -495,7 +654,9 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		}
 
 		/**
-		 * Limits the hardware parameter the capture device accepts.
+		 * Limits the hardware parameter the capture device accepts. The method
+		 * will extract the audio data specification from the pipe and enforce
+		 * them on the device.
 		 */
 		void create(ALSA::IOPlug& ioplug)
 		{
@@ -733,13 +894,46 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 
 	private:
 
+		/**
+		 * Pipe where data is read from.
+		 */
 		Piper::Pipe m_pipe;
+
+		/**
+		 * Outlet where data is read from.
+		 */
 		Piper::Outlet m_outlet;
+
+		/**
+		 * Timer for triggering period events. Its period should be the same as
+		 * the pipe period.
+		 */
 		Piper::Timer m_timer;
+
+		/**
+		 * Signpost for reporting device availability. It should be activated when
+		 * there are data in the device buffer for reading, deactivated otherwise.
+		 */
 		Piper::SignPost m_signpost;
-		ALSA::Range m_transfer_source;
-		ALSA::Range m_transfer_target;
+
+		/**
+		 * Pipe block that corresponds to the current device hardware pointer.
+		 * It is used to translate application pointers to corresponding pipe
+		 * positions.
+		 */
 		Piper::Outlet::Position m_cursor;
+
+		/**
+		 * ALSA range where data is transferred from. It helps with data copy in
+		 * the transfer callback.
+		 */
+		ALSA::Range m_transfer_source;
+
+		/**
+		 * ALSA range where data is transferred to. It helps with data copy in
+		 * the transfer callback.
+		 */
+		ALSA::Range m_transfer_target;
 
 };
 
@@ -748,8 +942,9 @@ extern "C"
 {
 
 	/**
-	 * Open the device. The function will parse the device configuration and call
-	 * the appropriate open function to initialize the device.
+	 * Open the piper device. The function will parse the device configuration
+	 * and initialize the appropriate IOPlug device according to the stream
+	 * type.
 	 */
 	SND_PCM_PLUGIN_DEFINE_FUNC(piper)
 	{
