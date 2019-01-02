@@ -16,6 +16,31 @@ namespace Piper
 
 	/**
 	 * Timer implements a mechanism for tracking time progress.
+	 *
+	 * A timer accepts period as a parameter. When a timer is started, it will
+	 * receive one tick per period. The accumulate method and its friends can
+	 * be used to update the tick counter to include the accumulated ticks. On
+	 * the other hand, accumulated ticks can be cleared via the consume or
+	 * clear method.
+	 *
+	 * Implementation Details
+	 * ======================
+	 *
+	 * The timer is essentially a thin wrapper around the Linux timerfd facility.
+	 * Please refer to respective manpages for details.
+	 *
+	 * Issues
+	 * ======
+	 *
+	 * The use of Linux specific API makes the software Linux-specific. However,
+	 * the project already depends on ALSA which is Linux only, so nothing is
+	 * lost due to the choice. On the other hand, the Linux timerfd API is much
+	 * more applicable to the project than the POSIX timer API due to possibliity
+	 * to poll(2) on the timer.
+	 *
+	 * Another issue is possible wrap-around for the tick counter. The situation
+	 * is deemed virtually impossible in the use case.
+	 *
 	 */
 	class Timer
 	{
@@ -105,13 +130,44 @@ namespace Piper
 			Timer& operator=(Timer&& bucket) = delete;
 
 		private:
+
+			/**
+			 * Descriptor of the timerfd.
+			 */
 			int m_descriptor;
+
+			/**
+			 * Period of the timer.
+			 */
 			Duration m_period;
+
+			/**
+			 * Number of ticks accumulated so far.
+			 */
 			unsigned int m_ticks;
 
+			/**
+			 * Buffer for storing overrun count read from the timerfd descriptor.
+			 */
 			std::uint64_t m_overrun;
+
+			/**
+			 * Pointer to the overrun buffer where data can be read into. Normally
+			 * it will point to nothing. However, while the timer is checking for
+			 * accumulated ticks, the pointer should point to `m_overrun` or the
+			 * following 7 bytes (`m_overrun` should be 8 byte long).
+			 */
 			char* m_destination;
+
+			/**
+			 * Number of bytes read into the overrun buffer.
+			 */
 			std::size_t m_consumed;
+
+			/**
+			 * Number of bytes to be read into the overrun buffer before it is
+			 * completed.
+			 */
 			std::size_t m_remainder;
 	};
 
