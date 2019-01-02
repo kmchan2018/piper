@@ -784,8 +784,8 @@ namespace ALSA
 		data->ioplug.name = (options.name ? options.name : "Unknown plugin");
 		data->ioplug.flags = 0;
 		data->ioplug.mmap_rw = 0;
-		data->ioplug.poll_fd = -1;
-		data->ioplug.poll_events = 0;
+		data->ioplug.poll_fd = options.poll_fd;
+		data->ioplug.poll_events = options.poll_events;
 		data->ioplug.callback = &data->callback;
 		data->ioplug.private_data = data.get();
 		data->callback.sw_params = alsa_ioplug_cb_sw_params;
