@@ -47,7 +47,7 @@ namespace Piper
 			/**
 			 * Configure the playback device for the pipe.
 			 */
-			virtual void configure(const Pipe& pipe, unsigned int preroll)= 0;
+			virtual void configure(const Pipe& pipe, unsigned int prebuffer) = 0;
 
 			/**
 			 * Start the playback. The call will configure the device so that it
@@ -204,7 +204,7 @@ namespace Piper
 			/**
 			 * Do nothing.
 			 */
-			void configure(const Pipe& pipe, unsigned int preroll) override {}
+			void configure(const Pipe& pipe, unsigned int prebuffer) override {}
 
 			/**
 			 * Do nothing.
@@ -326,7 +326,7 @@ namespace Piper
 			 * PCM according to the pipe and calculate the frame size for unit
 			 * conversion.
 			 */
-			void configure(const Pipe& pipe, unsigned int preroll) override;
+			void configure(const Pipe& pipe, unsigned int prebuffer) override;
 
 			/**
 			 * Prepare the ALSA PCM so that its buffer can be written into. Playback

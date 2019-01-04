@@ -148,7 +148,7 @@ namespace Piper
 		}
 	}
 
-	void AlsaPlaybackDevice::configure(const Pipe& pipe, unsigned int preroll)
+	void AlsaPlaybackDevice::configure(const Pipe& pipe, unsigned int prebuffer)
 	{
 		if (m_partial_data != nullptr) {
 			delete[] m_partial_data;
@@ -163,7 +163,7 @@ namespace Piper
 		snd_pcm_sw_params_t* swparams = nullptr;
 		snd_pcm_uframes_t pipe_period_size = pipe.period_size() / m_frame_size;
 		snd_pcm_uframes_t device_period_size = pipe_period_size;
-		snd_pcm_uframes_t device_buffer_size = std::min(pipe_period_size * preroll, 2 * pipe_period_size);
+		snd_pcm_uframes_t device_buffer_size = std::min(pipe_period_size * prebuffer, 2 * pipe_period_size);
 		int dir, err;
 
 		snd_pcm_hw_params_alloca(&hwparams);
