@@ -16,7 +16,29 @@ namespace Piper
 {
 
 	/**
-	 * This class defines the abstract base class for playback devices.
+	 * This class defines the abstract base class for playback devices. The use
+	 * case of a playback device instance is as follow:
+	 *
+	 * First of all, the device has to be configured for a pipe so that the
+	 * device can accept audio data from the pipe. Depending on each device,
+	 * it is possible to configure the number of period the device will buffer
+	 * before the playback actually starts, and allows the device to tolerate
+	 * some minmor jitter to the audio stream timing.
+	 *
+	 * Next, the start method can be called. After the call, the device will
+	 * accept writes. The actual playback will start once the buffer is filled
+	 * to the configured prebuffer level.
+	 *
+	 * Finally, the stop method can be called to stop the playback. Whether the
+	 * device will process remaining buffered data is implementation defined.
+	 *
+	 * Notes on Partial Frames
+	 * =======================
+	 *
+	 * The most fundamental unit in audio transmission is frame which is usually
+	 * larger than a byte. It creates a problem where partial frames may be
+	 * written. Currently all implemented devices can deal with partial frames.
+	 *
 	 */
 	class PlaybackDevice
 	{
@@ -40,24 +62,69 @@ namespace Piper
 			virtual void stop() = 0;
 
 			/**
-			 * Write audio data to the playback device.
+			 * Write audio data to the playback device. The method is blocking and
+			 * return only until all data in the buffer is written, signals
+			 * notwithstanding.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given buffer should have its length equal to
+			 * multiples of frame size, or the method will throw exception.
 			 */
 			virtual void write(const Buffer buffer) = 0;
 
 			/**
-			 * Write audio data to the playback device.
+			 * Write audio data to the playback device. Unlike the write variant,
+			 * the method will wait until the device is ready, write some data to
+			 * the device and then return. Signals may interrupt the method and
+			 * cause it to return early without doing any writes.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given source should have its remainder equal to
+			 * multiples of frame size, or the method will throw exception.
 			 */
 			virtual void try_write(Source& source) = 0;
 
 			/**
-			 * Write audio data to the playback device.
+			 * Write audio data to the playback device. Unlike the write variant,
+			 * the method will wait until the device is ready or until the timeout
+			 * has elapsed, write some data to the device and then return. Signals
+			 * may interrupt the method and cause it to return early without doing
+			 * any writes.
+			 *
+			 * The timeout is measured in microseconds. Two special sentinel values
+			 * are also allowed. 0 indicates zero waiting, making the method totally
+			 * non-blocking. -1 means indefinite waiting, causing the method to
+			 * behave like the other try_write variant without timeout parameter.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given source should have its remainder equal to
+			 * multiples of frame size, or the method will throw exception.
 			 */
 			virtual void try_write(Source& source, int timeout) = 0;
 
 	};
 
 	/**
-	 * This class defines the abstract base class for capture devices.
+	 * This class defines the abstract base class for capture devices. The use
+	 * case of a playback device instance is as follow:
+	 *
+	 * First of all, the device has to be configured for a pipe so that the
+	 * device can read audio data acceptable to the pipe. Unlike playback
+	 * devices, capture devices do not do any buffering.
+	 *
+	 * Next, the start method can be called. After the call, the device will
+	 * be read from.
+	 *
+	 * Finally, the stop method can be called to stop the capture. Audio data
+	 * remaining in the device buffer will be discarded.
+	 *
+	 * Notes on Partial Frames
+	 * =======================
+	 *
+	 * The most fundamental unit in audio transmission is frame which is usually
+	 * larger than a byte. It creates a problem where partial frames may be
+	 * read. Currently all implemented devices can deal with partial frames.
+	 *
 	 */
 	class CaptureDevice
 	{
@@ -79,17 +146,43 @@ namespace Piper
 			virtual void stop() = 0;
 
 			/**
-			 * Read audio data from the capture device.
+			 * Read audio data from the capture device. The method is blocking and
+			 * return only until the buffer is completely filled with data, signals
+			 * notwithstanding.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given buffer should have its length equal to
+			 * multiples of frame size, or the method will throw exception.
 			 */
 			virtual void read(Buffer buffer) = 0;
 
 			/**
-			 * Read audio data from the capture device.
+			 * Read audio data from the capture device. Unlike the read variant,
+			 * the method will wait until the device is ready, read some data from
+			 * the device and then return. Signals may interrupt the method and
+			 * cause it to return early without doing any reads.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given destination should have both its remainder
+			 * equal to multiples of frame size, or the method will throw exception.
 			 */
 			virtual void try_read(Destination& destination) = 0;
 
 			/**
-			 * Read audio data from the capture device.
+			 * Read audio data from the capture device. Unlike the read variant,
+			 * the method will wait until the device is ready or until the timeout
+			 * has elapsed, read some data from the device and then return. Signals
+			 * may interrupt the method and cause it to return early without doing
+			 * any reads.
+			 *
+			 * The timeout is measured in microseconds. Two special sentinel values
+			 * are also allowed. 0 indicates zero waiting, making the method totally
+			 * non-blocking. -1 means indefinite waiting, causing the method to
+			 * behave like the other try_write variant without timeout parameter.
+			 *
+			 * The method MAY or MAY NOT support partial frames. When partial frame
+			 * is not supported, the given destination should have both its remainder
+			 * equal to multiples of frame size, or the method will throw exception.
 			 */
 			virtual void try_read(Destination& destination, int timeout) = 0;
 
@@ -97,7 +190,7 @@ namespace Piper
 
 	/**
 	 * This class implements a playback device that sends audio data to standard
-	 * output.
+	 * output. The class supports partial frames for all write member functions.
 	 */
 	class StdoutPlaybackDevice : public PlaybackDevice
 	{
@@ -145,13 +238,16 @@ namespace Piper
 
 		private:
 
+			/**
+			 * File handle for standard output.
+			 */
 			File m_file;
 
 	};
 
 	/**
 	 * This class implements a capture device that reads audio data from standard
-	 * input.
+	 * input. The class supports partial frames for all read member functions.
 	 */
 	class StdinCaptureDevice : public CaptureDevice
 	{
@@ -199,13 +295,17 @@ namespace Piper
 
 		private:
 
+			/**
+			 * File handle for standard input.
+			 */
 			File m_file;
 
 	};
 
 	/**
 	 * This class implements a playback device that sends audio data to ALSA
-	 * PCM.
+	 * PCM device. The class supports partial frames for all write member
+	 * functions.
 	 */
 	class AlsaPlaybackDevice : public PlaybackDevice
 	{
@@ -262,16 +362,40 @@ namespace Piper
 
 		private:
 
+			/**
+			 * Handle of the ALSA PCM device.
+			 */
 			snd_pcm_t* m_handle;
+
+			/**
+			 * Frame size of the audio data accepted by the device. It is used for
+			 * size conversion in write member functions. It also determines the
+			 * size of the partial frame cache.
+			 */
 			std::size_t m_frame_size;
+
+			/**
+			 * Size of the unwritten partial frame fragment cached in the device.
+			 * Zero indicates there are no unwritten partial frame. Positive value
+			 * indicates that the cache contains unwritten fragment of that length
+			 * in the beginning of the cache.
+			 */
 			std::size_t m_partial_size;
+
+			/**
+			 * Pointer to the partial frame cache. Its size is specified by the
+			 * `m_frame_size` member variable. Unwritten data can be found at the
+			 * beginning of the cache, and its amount is specified by the
+			 * `m_partial_size` member variable.
+			 */
 			char* m_partial_data;
 
 	};
 
 	/**
-	 * This class implements a capture device that reads audio data from alsa
-	 * capture device.
+	 * This class implements a capture device that reads audio data from ALSA
+	 * PCM device. The class supports partial frames for all read member
+	 * functions.
 	 */
 	class AlsaCaptureDevice : public CaptureDevice
 	{
@@ -324,9 +448,32 @@ namespace Piper
 
 		private:
 
+			/**
+			 * Handle of the ALSA PCM device.
+			 */
 			snd_pcm_t* m_handle;
+
+			/**
+			 * Frame size of the audio data returned by the device. It is used for
+			 * size conversion in read member functions. It also determines the
+			 * size of the partial frame cache.
+			 */
 			std::size_t m_frame_size;
+
+			/**
+			 * Size of the unread partial frame fragment cached in the device. Zero
+			 * indicates there are no unread partial frame. Positive value indicates
+			 * that the cache contains unread fragment of that length in the end of
+			 * the cache.
+			 */
 			std::size_t m_partial_size;
+
+			/**
+			 * Pointer to the partial frame cache. Its size is specified by the
+			 * `m_frame_size` member variable. Unread data can be found at the end
+			 * of the cache, and its amount is specified by the `m_partial_size`
+			 * member variable.
+			 */
 			char* m_partial_data;
 
 	};
