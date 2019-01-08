@@ -161,528 +161,528 @@ static inline int negative(int input)
 extern "C"
 {
 
-	static void alsa_ioplug_cb_trace(ALSA::IOPlug::Data* data, const char* event)
+	static void alsa_ioplug_cb_trace(ALSA::IOPlug::Handle* handle, const char* event)
 	{
-		if (data->trace) {
+		if (handle->trace) {
 			std::fprintf(stderr, "%s\n", event);
 		}
 	}
 
 	static int alsa_ioplug_cb_hw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_hw_params_t *params)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "hw_params callback called");
-			handler->hw_params(*handle, params);
-			alsa_ioplug_cb_trace(data, "hw_params callback completed");
+			alsa_ioplug_cb_trace(handle, "hw_params callback called");
+			implementation.hw_params(control, params);
+			alsa_ioplug_cb_trace(handle, "hw_params callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "hw_params callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "hw_params callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_hw_free(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "hw_free callback called");
-			handler->hw_free(*handle);
-			alsa_ioplug_cb_trace(data, "hw_free callback completed");
+			alsa_ioplug_cb_trace(handle, "hw_free callback called");
+			implementation.hw_free(control);
+			alsa_ioplug_cb_trace(handle, "hw_free callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "hw_free callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "hw_free callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_sw_params(snd_pcm_ioplug_t* ioplug, snd_pcm_sw_params_t *params)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 		int err;
 	
-		if ((err = snd_pcm_sw_params_get_boundary(params, &data->boundary)) < 0) {
+		if ((err = snd_pcm_sw_params_get_boundary(params, &handle->boundary)) < 0) {
 			return err;
 		}
 
 		try {
-			alsa_ioplug_cb_trace(data, "sw_params callback called");
-			handler->sw_params(*handle, params);
-			alsa_ioplug_cb_trace(data, "sw_params callback completed");
+			alsa_ioplug_cb_trace(handle, "sw_params callback called");
+			implementation.sw_params(control, params);
+			alsa_ioplug_cb_trace(handle, "sw_params callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "sw_params callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "sw_params callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_prepare(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "prepare callback called");
-			handler->prepare(*handle);
-			alsa_ioplug_cb_trace(data, "prepare callback completed");
+			alsa_ioplug_cb_trace(handle, "prepare callback called");
+			implementation.prepare(control);
+			alsa_ioplug_cb_trace(handle, "prepare callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "prepare callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "prepare callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_start(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "start callback called");
-			handler->start(*handle);
-			alsa_ioplug_cb_trace(data, "start callback completed");
+			alsa_ioplug_cb_trace(handle, "start callback called");
+			implementation.start(control);
+			alsa_ioplug_cb_trace(handle, "start callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "start callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "start callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "start callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "start callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "start callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "start callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "start callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_stop(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "stop callback called");
-			handler->stop(*handle);
-			alsa_ioplug_cb_trace(data, "stop callback completed");
+			alsa_ioplug_cb_trace(handle, "stop callback called");
+			implementation.stop(control);
+			alsa_ioplug_cb_trace(handle, "stop callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "stop callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "stop callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_drain(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "drain callback called");
-			handler->drain(*handle);
-			alsa_ioplug_cb_trace(data, "drain callback completed");
+			alsa_ioplug_cb_trace(handle, "drain callback called");
+			implementation.drain(control);
+			alsa_ioplug_cb_trace(handle, "drain callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "drain callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "drain callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_pause(snd_pcm_ioplug_t* ioplug, int enable)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "pause callback called");
-			handler->pause(*handle, enable);
-			alsa_ioplug_cb_trace(data, "pause callback completed");
+			alsa_ioplug_cb_trace(handle, "pause callback called");
+			implementation.pause(control, enable);
+			alsa_ioplug_cb_trace(handle, "pause callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "pause callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "pause callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_resume(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
-	
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
+
 		try {
-			alsa_ioplug_cb_trace(data, "resume callback called");
-			handler->resume(*handle);
-			alsa_ioplug_cb_trace(data, "resume callback completed");
+			alsa_ioplug_cb_trace(handle, "resume callback called");
+			implementation.resume(control);
+			alsa_ioplug_cb_trace(handle, "resume callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "resume callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "resume callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_poll_descriptors_count(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback called");
-			int result = handler->poll_descriptors_count(*handle);
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback completed");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback called");
+			int result = implementation.poll_descriptors_count(control);
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback completed");
 			return result;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors_count callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors_count callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_poll_descriptors(snd_pcm_ioplug_t* ioplug, struct pollfd *pfd, unsigned int space)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback called");
-			int result = handler->poll_descriptors(*handle, pfd, space);
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback completed");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback called");
+			int result = implementation.poll_descriptors(control, pfd, space);
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback completed");
 			return result;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "poll_descriptors callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "poll_descriptors callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_poll_revents(snd_pcm_ioplug_t* ioplug, struct pollfd *pfd, unsigned int nfds, unsigned short *revents)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "poll_revents callback called");
-			handler->poll_revents(*handle, pfd, nfds, revents);
-			alsa_ioplug_cb_trace(data, "poll_revents callback completed");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback called");
+			implementation.poll_revents(control, pfd, nfds, revents);
+			alsa_ioplug_cb_trace(handle, "poll_revents callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "poll_revents callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "poll_revents callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static snd_pcm_sframes_t alsa_ioplug_cb_pointer(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "pointer callback called");
-			snd_pcm_sframes_t result = handler->pointer(*handle) % handle->buffer_size();
-			alsa_ioplug_cb_trace(data, "pointer callback completed");
+			alsa_ioplug_cb_trace(handle, "pointer callback called");
+			snd_pcm_sframes_t result = implementation.pointer(control) % control.buffer_size();
+			alsa_ioplug_cb_trace(handle, "pointer callback completed");
 			return result;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "pointer callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "pointer callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static snd_pcm_sframes_t alsa_ioplug_cb_transfer(snd_pcm_ioplug_t* ioplug, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "transfer callback called");
-			snd_pcm_sframes_t result = handler->transfer(*handle, areas, offset, size);
-			alsa_ioplug_cb_trace(data, "transfer callback completed");
+			alsa_ioplug_cb_trace(handle, "transfer callback called");
+			snd_pcm_sframes_t result = implementation.transfer(control, areas, offset, size);
+			alsa_ioplug_cb_trace(handle, "transfer callback completed");
 			return result;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "transfer callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "transfer callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static void alsa_ioplug_cb_dump(snd_pcm_ioplug_t* ioplug, snd_output_t* output)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
-	
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
+
 		try {
-			alsa_ioplug_cb_trace(data, "dump callback called");
-			handler->dump(*handle, output);
-			alsa_ioplug_cb_trace(data, "dump callback completed");
+			alsa_ioplug_cb_trace(handle, "dump callback called");
+			implementation.dump(control, output);
+			alsa_ioplug_cb_trace(handle, "dump callback completed");
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "dump callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "dump callback failed with unknown error");
 		}
 	}
 
 	static int alsa_ioplug_cb_delay(snd_pcm_ioplug_t* ioplug, snd_pcm_sframes_t *delayp)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "delay callback called");
-			handler->delay(*handle, delayp);
-			alsa_ioplug_cb_trace(data, "delay callback completed");
+			alsa_ioplug_cb_trace(handle, "delay callback called");
+			implementation.delay(control, delayp);
+			alsa_ioplug_cb_trace(handle, "delay callback completed");
 			return 0;
 		} catch (std::system_error& ex) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with system error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with system error");
 			return negative(ex.code().value());
 		} catch (std::bad_alloc& ex) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with memory error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with memory error");
 			return -ENOMEM;
 		} catch (std::bad_cast& ex) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with cast error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with cast error");
 			return -EBADF;
 		} catch (std::runtime_error& ex) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with logic error");
 			return -EBADF;
 		} catch (std::logic_error& ex) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with logic error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with logic error");
 			return -EBADF;
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "delay callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "delay callback failed with unknown error");
 			return -EBADF;
 		}
 	}
 
 	static int alsa_ioplug_cb_close(snd_pcm_ioplug_t* ioplug)
 	{
-		ALSA::IOPlug::Data* data = static_cast<ALSA::IOPlug::Data*>(ioplug->private_data);
-		ALSA::IOPlug::Handler* handler = data->handle->handler();
-		ALSA::IOPlug* handle = data->handle;
+		ALSA::IOPlug::Handle* handle = static_cast<ALSA::IOPlug::Handle*>(ioplug->private_data);
+		ALSA::IOPlug::Implementation& implementation = *(handle->implementation);
+		ALSA::IOPlug::Control& control = *(handle->control);
 
 		try {
-			alsa_ioplug_cb_trace(data, "close callback called");
-			handler->close(*handle);
+			alsa_ioplug_cb_trace(handle, "close callback called");
+			implementation.close(control);
 		} catch (...) {
-			alsa_ioplug_cb_trace(data, "dump callback failed with unknown error");
+			alsa_ioplug_cb_trace(handle, "dump callback failed with unknown error");
 		}
 
 		delete handle;
-		alsa_ioplug_cb_trace(data, "close callback completed");
+		alsa_ioplug_cb_trace(handle, "close callback completed");
 		return 0;
 	}
 
@@ -691,13 +691,13 @@ extern "C"
 namespace ALSA
 {
 
-	snd_pcm_uframes_t IOPlug::buffer_used() noexcept
+	snd_pcm_uframes_t IOPlug::Control::buffer_used() noexcept
 	{
-		snd_pcm_stream_t stream = m_data->ioplug.stream;
-		snd_pcm_uframes_t boundary = m_data->boundary;
-		snd_pcm_uframes_t hw_ptr = m_data->ioplug.hw_ptr;
-		snd_pcm_uframes_t appl_ptr = m_data->ioplug.appl_ptr;
-		snd_pcm_uframes_t buffer = m_data->ioplug.buffer_size;
+		snd_pcm_stream_t stream = m_handle.ioplug.stream;
+		snd_pcm_uframes_t boundary = m_handle.boundary;
+		snd_pcm_uframes_t hw_ptr = m_handle.ioplug.hw_ptr;
+		snd_pcm_uframes_t appl_ptr = m_handle.ioplug.appl_ptr;
+		snd_pcm_uframes_t buffer = m_handle.ioplug.buffer_size;
 		snd_pcm_uframes_t used = 0;
 
 		assert(stream == SND_PCM_STREAM_PLAYBACK || stream == SND_PCM_STREAM_CAPTURE);
@@ -719,69 +719,83 @@ namespace ALSA
 		return used;
 	}
 
-	snd_pcm_uframes_t IOPlug::buffer_free() noexcept
+	snd_pcm_uframes_t IOPlug::Control::buffer_free() noexcept
 	{
-		snd_pcm_uframes_t dev_buffer = m_data->ioplug.buffer_size;
+		snd_pcm_uframes_t dev_buffer = m_handle.ioplug.buffer_size;
 		snd_pcm_uframes_t dev_used = buffer_used();
 		return dev_buffer - dev_used;
 	}
 
-	void IOPlug::set_state(snd_pcm_state_t state)
+	void IOPlug::Control::set_state(snd_pcm_state_t state)
 	{
-		int err = snd_pcm_ioplug_set_state(&m_data->ioplug, state);
+		int err = snd_pcm_ioplug_set_state(&m_handle.ioplug, state);
 
 		if (err == -EINVAL) {
 			throw std::invalid_argument("invalid state");
 		} else if (err < 0) {
-			throw BaseException(snd_strerror(err), err);
+			throw error(err, snd_strerror(err));
 		}
 	}
 
-	void IOPlug::set_parameter_range(int type, unsigned int min, unsigned int max)
+	void IOPlug::Control::set_parameter_range(int type, unsigned int min, unsigned int max)
 	{
-		int err = snd_pcm_ioplug_set_param_minmax(&m_data->ioplug, type, min, max);
+		int err = snd_pcm_ioplug_set_param_minmax(&m_handle.ioplug, type, min, max);
 
 		if (err == -EINVAL) {
 			throw std::invalid_argument("invalid parameter type and/or range");
 		} else if (err == -ENOMEM) {
 			throw std::bad_alloc();
 		} else if (err < 0) {
-			throw BaseException(snd_strerror(err), err);
+			throw error(err, snd_strerror(err));
 		}
 	}
 
-	void IOPlug::set_parameter_list(int type, unsigned int len, unsigned int* list)
+	void IOPlug::Control::set_parameter_list(int type, unsigned int len, unsigned int* list)
 	{
-		int err = snd_pcm_ioplug_set_param_list(&m_data->ioplug, type, len, list);
+		int err = snd_pcm_ioplug_set_param_list(&m_handle.ioplug, type, len, list);
 
 		if (err == -EINVAL) {
 			throw std::invalid_argument("invalid parameter type and/or range");
 		} else if (err == -ENOMEM) {
 			throw std::bad_alloc();
 		} else if (err < 0) {
-			throw BaseException(snd_strerror(err), err);
+			throw error(err, snd_strerror(err));
 		}
 	}
 
-	snd_pcm_t* ALSA::IOPlug::open(const char* name, snd_pcm_stream_t stream, int mode, std::unique_ptr<ALSA::IOPlug::Handler>&& handler)
+	snd_pcm_uframes_t IOPlug::Control::calculate_next_hardware_pointer(snd_pcm_uframes_t increment)
+	{
+		if (increment <= m_handle.ioplug.buffer_size) {
+			return (m_handle.ioplug.hw_ptr + increment) % m_handle.boundary;
+		} else {
+			throw std::invalid_argument("hardware pointer increment larger than buffer size");
+		}
+	}
+
+	IOPlug::IOPlug(const char* name, snd_pcm_stream_t stream, int mode, std::unique_ptr<ALSA::IOPlug::Implementation>&& implementation)
 	{
 		if (nullptr == name) {
 			throw std::invalid_argument("invalid name");
-		} else if (false == static_cast<bool>(handler)) {
-			throw std::invalid_argument("invalid handler");
+		} else if (nullptr == implementation.get()) {
+			throw std::invalid_argument("invalid implementation");
 		}
 
-		std::unique_ptr<Data> data(new Data);
+		std::unique_ptr<Handle> data(new Handle);
+		std::unique_ptr<Control> control(new Control(*data));
 		Options options;
 		int err;
 
 		std::memset(&data->ioplug, 0, sizeof(snd_pcm_ioplug_t));
 		std::memset(&data->callback, 0, sizeof(snd_pcm_ioplug_callback_t));
 
-		handler->configure(name, stream, mode, options);
+		implementation->configure(name, stream, mode, options);
 
+		data->name = (options.name ? options.name : "Unknown Plugin");
+		data->trace = false;
+		data->control = std::move(control);
+		data->implementation = std::move(implementation);
 		data->ioplug.version = SND_PCM_IOPLUG_VERSION;
-		data->ioplug.name = (options.name ? options.name : "Unknown plugin");
+		data->ioplug.name = data->name.data();
 		data->ioplug.flags = 0;
 		data->ioplug.mmap_rw = 0;
 		data->ioplug.poll_fd = options.poll_fd;
@@ -793,7 +807,6 @@ namespace ALSA
 		data->callback.stop = alsa_ioplug_cb_stop;
 		data->callback.pointer = alsa_ioplug_cb_pointer;
 		data->callback.close = alsa_ioplug_cb_close;
-		data->trace = false;
 
 		if (options.mmap) data->ioplug.mmap_rw = 1;
 		if (options.listed) data->ioplug.flags |= SND_PCM_IOPLUG_FLAG_LISTED;
@@ -819,24 +832,35 @@ namespace ALSA
 			switch (err) {
 				case -EINVAL: throw std::invalid_argument("invalid name, stream or mode");
 				case -ENOMEM: throw std::bad_alloc();
-				default: throw BaseException(snd_strerror(err), err);
+				default: throw error(err, snd_strerror(err));
 			}
 		}
 
-		snd_pcm_t* pcmp = data->ioplug.pcm;
-		IOPlug::Data* datap = data.get();
-		IOPlug::Handler* handlerp = handler.get();
-		IOPlug* handlep = new IOPlug(std::move(data), std::move(handler));
-		datap->handle = handlep;
+		m_handle = data.release();
+		m_handle->implementation->create(*(m_handle->control));
+	}
 
-		try {
-			handlerp->create(*handlep);
-		} catch (...) {
-			snd_pcm_ioplug_delete(&datap->ioplug);
-			throw;
+	IOPlug::~IOPlug()
+	{
+		if (m_handle != nullptr) {
+			snd_pcm_ioplug_delete(&m_handle->ioplug);
 		}
+	}
 
-		return pcmp;
+	IOPlug::Implementation& IOPlug::implementation() const
+	{
+		if (m_handle != nullptr) {
+			return *(m_handle->implementation);
+		} else {
+			throw std::runtime_error("ioplug device released");
+		}
+	}
+
+	snd_pcm_t* IOPlug::release() noexcept
+	{
+		snd_pcm_t* result = m_handle->ioplug.pcm;
+		m_handle = nullptr;
+		return result;
 	}
 
 };

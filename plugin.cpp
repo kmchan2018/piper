@@ -89,7 +89,7 @@
  * creates free space in the device buffer.
  *
  */
-class PiperPlaybackHandler : public ALSA::IOPlug::Handler
+class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 {
 	public:
 
@@ -143,7 +143,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * will extract the audio data specification from the pipe and enforce
 		 * them on the device.
 		 */
-		void create(ALSA::IOPlug& ioplug)
+		void create(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -153,12 +153,12 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 			unsigned int rate_list[] = { m_pipe.rate() };
 			unsigned int period_list[] = { static_cast<unsigned int>(m_pipe.period_size()) };
 
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_ACCESS, 2, access_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_FORMAT, 1, format_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
-			ioplug.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_inlet.window());
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_ACCESS, 2, access_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_FORMAT, 1, format_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
+			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_inlet.window());
 		}
 
 		/**
@@ -185,12 +185,12 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
  		 * Finally, this callback will activate the signpost to report that
 		 * the device can be written to.
 		 */
-		void prepare(ALSA::IOPlug& ioplug)
+		void prepare(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
 			m_status = Status::IDLE;
-			m_buffer = ioplug.buffer_size() / ioplug.period_size();
+			m_buffer = control.buffer_size() / control.period_size();
 			m_expirations = 0;
 			m_signpost.activate();
 
@@ -212,7 +212,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * ensure that the pump thread will watch the timer and periodically
 		 * flush blocks into the pipe.
 		 */
-		void start(ALSA::IOPlug& ioplug)
+		void start(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -231,7 +231,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * Additionally, this callback will deactivate the signpost to reflect
 		 * the fact that the device is no longer accepting audio data.
 		 */
-		void stop(ALSA::IOPlug& ioplug)
+		void stop(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -246,7 +246,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * Return the number of descriptors that should be polled by the client
 		 * for device events. This callback will return 1 for signpost descriptor.
 		 */
-		int poll_descriptors_count(ALSA::IOPlug& ioplug)
+		int poll_descriptors_count(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 			return 1;
@@ -256,7 +256,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * Return the details of descriptors that should be polled by the client
 		 * for device events. See the other poll callbacks for more information.
 		 */
-		int poll_descriptors(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int space)
+		int poll_descriptors(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
 		{
 			assert(pfd != nullptr);
 			assert(space >= 1);
@@ -276,7 +276,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * POLLOUT events. It is because signpost descriptor can only be polled
 		 * for POLLIN events but the application expects POLLOUT events.
 		 */
-		void poll_revents(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
+		void poll_revents(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 		{
 			assert(pfd != nullptr);
 			assert(revents != nullptr);
@@ -314,12 +314,12 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * reset the expiration count to zero since the hardware pointer and the
 		 * first writable block of the pipe should once again align.
 		 */
-		snd_pcm_uframes_t pointer(ALSA::IOPlug& ioplug)
+		snd_pcm_uframes_t pointer(ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
-			const snd_pcm_uframes_t period = ioplug.period_size();
-			const snd_pcm_uframes_t used = ioplug.buffer_used();
+			const snd_pcm_uframes_t period = control.period_size();
+			const snd_pcm_uframes_t used = control.buffer_used();
 			const snd_pcm_uframes_t flushed = m_expirations * period;
 
 			m_expirations = 0;
@@ -331,13 +331,10 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 				m_expirations = 0;
 				m_buffer = 0;
 				m_status = Status::IDLE;
-				throw ALSA::XrunException();
+				throw ALSA::xrun_error();
 			}
 
-			const snd_pcm_uframes_t boundary = ioplug.boundary();
-			const snd_pcm_uframes_t current_pointer = ioplug.hardware_pointer();
-			const snd_pcm_uframes_t next_pointer = (current_pointer + flushed) % boundary;
-			return next_pointer;
+			return control.calculate_next_hardware_pointer(flushed);
 		}
 
 		/**
@@ -362,16 +359,16 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 *
 		 * Finally, the amount of data copied is returned.
 		 */
-		snd_pcm_uframes_t transfer(ALSA::IOPlug& ioplug, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
+		snd_pcm_uframes_t transfer(ALSA::IOPlug::Control& control, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
 		{
 			assert(areas != nullptr);
 			assert(size > 0);
 
 			std::lock_guard<std::mutex> guard(m_mutex);
 
-			const snd_pcm_uframes_t period = ioplug.period_size();
-			const snd_pcm_uframes_t used = ioplug.buffer_used();
-			const snd_pcm_uframes_t free = ioplug.buffer_free();
+			const snd_pcm_uframes_t period = control.period_size();
+			const snd_pcm_uframes_t used = control.buffer_used();
+			const snd_pcm_uframes_t free = control.buffer_free();
 			const snd_pcm_uframes_t flushed = m_expirations * period;
 
 			if (used < flushed) {
@@ -381,7 +378,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 				m_expirations = 0;
 				m_buffer = 0;
 				m_status = Status::IDLE;
-				throw ALSA::XrunException();
+				throw ALSA::xrun_error();
 			}
 
 			Piper::Inlet::Position increment = used / period;
@@ -497,7 +494,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
 		 * Close the device. This callback will update the status to END and wait
 		 * until the pump thread finishes.
 		 */
-		void close(ALSA::IOPlug& ioplug)
+		void close(ALSA::IOPlug::Control& control)
 		{
 			m_status = Status::END;
 			m_pump.join();
@@ -621,7 +618,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Handler
  * the playback counterpart, the signpost is not activated every period.
  *
  */
-class PiperCaptureHandler : public ALSA::IOPlug::Handler
+class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 {
 	public:
 
@@ -658,7 +655,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * will extract the audio data specification from the pipe and enforce
 		 * them on the device.
 		 */
-		void create(ALSA::IOPlug& ioplug)
+		void create(ALSA::IOPlug::Control& control)
 		{
 			unsigned int access_list[] = { SND_PCM_ACCESS_RW_INTERLEAVED, SND_PCM_ACCESS_RW_NONINTERLEAVED };
 			unsigned int format_list[] = { static_cast<unsigned int>(m_pipe.format_code_alsa()) };
@@ -666,12 +663,12 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 			unsigned int rate_list[] = { m_pipe.rate() };
 			unsigned int period_list[] = { static_cast<unsigned int>(m_pipe.period_size()) };
 
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_ACCESS, 2, access_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_FORMAT, 1, format_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
-			ioplug.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
-			ioplug.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_outlet.window());
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_ACCESS, 2, access_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_FORMAT, 1, format_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
+			control.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
+			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_outlet.window());
 		}
 
 		/**
@@ -683,7 +680,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
  		 * This callback will deactivate the signpost to report that the device
 		 * cannot be read from yet.
 		 */
-		void prepare(ALSA::IOPlug& ioplug)
+		void prepare(ALSA::IOPlug::Control& control)
 		{
 			m_signpost.deactivate();
 		}
@@ -697,7 +694,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * hardware pointer updates. It will also initialize the cursor to point
 		 * to the end of pipe read window.
 		 */
-		void start(ALSA::IOPlug& ioplug)
+		void start(ALSA::IOPlug::Control& control)
 		{
 			m_timer.start();
 			m_cursor = m_outlet.until();
@@ -711,7 +708,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * The callback will stop the timer and deactivate the signpost to reflect
 		 * the situation.
 		 */
-		void stop(ALSA::IOPlug& ioplug)
+		void stop(ALSA::IOPlug::Control& control)
 		{
 			m_timer.stop();
 			m_signpost.deactivate();
@@ -727,7 +724,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * descriptor is responsible for advertising availability of data in the
 		 * device buffer and hence opportunities of non-blocking reads.
 		 */
-		int poll_descriptors_count(ALSA::IOPlug& ioplug)
+		int poll_descriptors_count(ALSA::IOPlug::Control& control)
 		{
 			return 2;
 		}
@@ -736,7 +733,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * Return the details of descriptors that should be polled by the client
 		 * for device events. See the other poll callbacks for more information.
 		 */
-		int poll_descriptors(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int space)
+		int poll_descriptors(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
 		{
 			assert(pfd != nullptr);
 			assert(space >= 2);
@@ -755,7 +752,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * Check the poll result and return the device events. Note that the
 		 * callback will not need to mangle event codes.
 		 */
-		void poll_revents(ALSA::IOPlug& ioplug, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
+		void poll_revents(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 		{
 			assert(pfd != nullptr);
 			assert(revents != nullptr);
@@ -787,11 +784,11 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * 7. Deactivate the signpost otherwise.
 		 * 8. Calculate the new hardware pointer and return it.
 		 */
-		snd_pcm_uframes_t pointer(ALSA::IOPlug& ioplug)
+		snd_pcm_uframes_t pointer(ALSA::IOPlug::Control& control)
 		{
-			const snd_pcm_uframes_t period = ioplug.period_size();
-			const snd_pcm_uframes_t used = ioplug.buffer_used();
-			const snd_pcm_uframes_t free = ioplug.buffer_free();
+			const snd_pcm_uframes_t period = control.period_size();
+			const snd_pcm_uframes_t used = control.buffer_used();
+			const snd_pcm_uframes_t free = control.buffer_free();
 
 			m_timer.try_accumulate(0);
 			m_timer.consume();
@@ -803,14 +800,8 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 			if (incoming > free) {
 				m_timer.stop();
 				m_signpost.deactivate();
-				throw ALSA::XrunException();
-			}
-
-			const snd_pcm_uframes_t boundary = ioplug.boundary();
-			const snd_pcm_uframes_t current_pointer = ioplug.hardware_pointer();
-			const snd_pcm_uframes_t next_pointer = (current_pointer + incoming) % boundary;
-
-			if (incoming > 0) {
+				throw ALSA::xrun_error();
+			} else if (incoming > 0) {
 				m_cursor = until;
 				m_signpost.activate();
 			} else if (used > 0) {
@@ -819,7 +810,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 				m_signpost.deactivate();
 			}
 
-			return next_pointer;
+			return control.calculate_next_hardware_pointer(incoming);
 		}
 
 		/**
@@ -840,13 +831,13 @@ class PiperCaptureHandler : public ALSA::IOPlug::Handler
 		 * 7. Activate the signpost otherwise.
 		 * 8. Return the amount of frames copied.
 		 */
-		snd_pcm_uframes_t transfer(ALSA::IOPlug& ioplug, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
+		snd_pcm_uframes_t transfer(ALSA::IOPlug::Control& control, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size)
 		{
 			assert(areas != nullptr);
 			assert(size > 0);
 
-			const snd_pcm_uframes_t period = ioplug.period_size();
-			const snd_pcm_uframes_t used = ioplug.buffer_used();
+			const snd_pcm_uframes_t period = control.period_size();
+			const snd_pcm_uframes_t used = control.buffer_used();
 			
 			Piper::Outlet::Position decrement = used / period + (used % period > 0 ? 1 : 0);
 			Piper::Outlet::Position block = m_cursor - decrement;
@@ -981,12 +972,12 @@ extern "C"
 
 		try {
 			if (stream == SND_PCM_STREAM_PLAYBACK) {
-				std::unique_ptr<ALSA::IOPlug::Handler> handler(new PiperPlaybackHandler(path));
-				*pcmp = ALSA::IOPlug::open(name, stream, mode, std::move(handler));
+				ALSA::IOPlug ioplug{name, stream, mode, std::unique_ptr<ALSA::IOPlug::Implementation>(new PiperPlaybackHandler(path))};
+				*pcmp = ioplug.release();
 				return 0;
 			} else if (stream == SND_PCM_STREAM_CAPTURE) {
-				std::unique_ptr<ALSA::IOPlug::Handler> handler(new PiperCaptureHandler(path));
-				*pcmp = ALSA::IOPlug::open(name, stream, mode, std::move(handler));
+				ALSA::IOPlug ioplug{name, stream, mode, std::unique_ptr<ALSA::IOPlug::Implementation>(new PiperCaptureHandler(path))};
+				*pcmp = ioplug.release();
 				return 0;
 			} else {
 				SNDERR("device %s cannot be initialized: device supports playback only", name);

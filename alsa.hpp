@@ -84,30 +84,90 @@ namespace ALSA
 	};
 
 	/**
-	 * Handle to the IOPlug implementation.
+	 * This class implements a ALSA IOPlug PCM device. This class wraps around
+	 * the IOPlug subsystem of the ALSA library and provides a C++ interface to
+	 * that functionality.
+	 *
+	 * To create a new device, the constructor can be used. It takes a few
+	 * parameters, in particular the implementation instance that backs the
+	 * device. The device will take ownership of the implementation instance
+	 * and manages its lifecycle as indicated by the unique pointer parameter
+	 * type. It is therefore generally incorrect to share an implementation
+	 * instance among multiple devices.
+	 *
+	 * Upon creation, this class instance will own the underlying device handle;
+	 * destruction of the instance will destroy the underlying handle as well.
+	 * The release member function will cause this class instance to give up
+	 * the ownership and return a pointer to the snd_pcm_t structure in the
+	 * underlying device handle. This design is to ensure proper cleanup and
+	 * disposal of underlying handle in spite of exceptions and other scenario
+	 * where a device is created but left unused.
 	 */
 	class IOPlug
 	{
 		public:
 
+			class Control;
+			class Implementation;
+
 			/**
-			 * IOPlug core data. This is the central piece of data for the IOPlug
-			 * implementation. The actual IOPlug struct points its private data to
-			 * this structure, and from here callbacks can access other parts of
-			 * the implementation.
+			 * IOPlug handle. This is the central piece of data for a IOPlug device.
+			 * The snd_pcm_ioplug_t structure points its private data to this handle,
+			 * and from here callbacks can access other data they will ever need.
+			 *
+			 * The `ioplug` field contains the actual snd_pcm_ioplug_t structure.
+			 * The `callback` field contains the callback table. These two fields
+			 * are the data structure from IOPlug subsystem of the ALSA library.
+			 *
+			 * The `boundary` field stores the boundary software parameter of the
+			 * device. It is the wrap-around point of both hardware and application
+			 * pointers and therefore pretty much essential in correct operation
+			 * of the device. Curiously, ALSA snd_pcm_ioplug_t DO NOT expose this
+			 * parameter for implementation. Hence, this field is added to track
+			 * it.
+			 *
+			 * The `control` field points to a control object that can query, control
+			 * and tune the the IOPlug device. The `implementation` fields points to
+			 * the implementation of the device.
+			 *
+			 * Finally, some of the fields points to some auxillary data about the
+			 * the device. The `name` field contains the device name; the `trace`
+			 * field indicates if callback tracing is enabled.
+			 *
+			 * This structure owns both the control and implementation instance once
+			 * assigned.
 			 */
-			struct Data
+			struct Handle
 			{
 				snd_pcm_ioplug_t ioplug;
 				snd_pcm_ioplug_callback_t callback;
 				snd_pcm_uframes_t boundary;
-				IOPlug* handle;
+				std::unique_ptr<Control> control;
+				std::unique_ptr<Implementation> implementation;
+				std::string name;
 				bool trace = false;
 			};
 
 			/**
 			 * IOPlug options. The options is used to configure the PCM device
 			 * before its creation.
+			 *
+			 * The `name` field points to a C-style string carrying the name of the
+			 * PCM device.
+			 *
+			 * The `mmap` field indicates if a memory buffer should be allocated by
+			 * ALSA automatically for mmap style transfer. If this is set to true,
+			 * the `mmap_area` member function of the hndle class will return the
+			 * backing memory buffer. Otherwise, the member function will return
+			 * nullptr.
+			 *
+			 * The `poll_fd` and `poll_events` fields contain the descriptor and
+			 * events the device can be polled.
+			 *
+			 * The `enable_xxx_callback` fields indicates if a particular callback
+			 * is implemented. Setting the corresponding field to true will cause
+			 * the corresponding member function of the implementation class to be
+			 * called.
 			 */
 			struct Options
 			{
@@ -132,316 +192,375 @@ namespace ALSA
 			};
 
 			/**
-			 * Abstract class for IOPlug callback handler. The IOPlug system uses
-			 * callbacks to trigger PCM device actions.
+			 * Control to the IOPlug device. This class allows implementation classes
+			 * to query, control and tune the controlled device. Many callbacks in
+			 * the implementation class will be given a reference of this class so
+			 * that they can work with the device.
 			 */
-			class Handler
+			class Control
 			{
 				public:
 
 					/**
-					 * Virtual destructor.
+					 * Construct a new control.
 					 */
-					virtual ~Handler() {}
+					Control(Handle& handle) : m_handle(handle) {}
+
+					/**
+					 * Return the stream direction of the PCM device.
+					 */
+					snd_pcm_stream_t stream() const noexcept { return m_handle.ioplug.stream; }
+
+					/**
+					 * Return the current state of the PCM device.
+					 */
+					snd_pcm_state_t state() noexcept { return m_handle.ioplug.state; }
+
+					/**
+					 * Return the current access mode of the PCM device. Note that it is
+					 * only valid after the device is configured.
+					 */
+					snd_pcm_access_t access() const noexcept { return m_handle.ioplug.access; }
+
+					/**
+					 * Return the current format of the PCM device. Note that it is only
+					 * valid after the device is configured.
+					 */
+					snd_pcm_format_t format() noexcept { return m_handle.ioplug.format; }
+
+					/**
+					 * Return the current channels of the PCM device. Note that it is
+					 * only valid after the device is configured.
+					 */
+					unsigned int channels() noexcept { return m_handle.ioplug.channels; }
+
+					/**
+					 * Return the current sampling rate of the PCM device. Note that it
+					 * is only valid after the device is configured.
+					 */
+					unsigned int rate() noexcept { return m_handle.ioplug.rate; }
+
+					/**
+					 * Return the current period size (in frames) of the PCM device. Note
+					 * that it is only valid after the device confirms its hardware
+					 * parameters.
+					 */
+					snd_pcm_uframes_t period_size() noexcept { return m_handle.ioplug.period_size; }
+
+					/**
+					 * Return the current buffer size (in frames) of the PCM device. Note
+					 * that it is only valid after the device confirms its hardware
+					 * parameters.
+					 */
+					snd_pcm_uframes_t buffer_size() noexcept { return m_handle.ioplug.buffer_size; }
+
+					/**
+					 * Return the current boundary of the PCM device (in frames). It
+					 * indicates the upper limits of hardware and application pointers.
+					 * Wrap-around will occur when any pointer exceeds the boundary.
+					 * Note that it is only valid after the device confirms its software
+					 * parameters.
+					 */
+					snd_pcm_uframes_t boundary() noexcept { return m_handle.boundary; }
+
+					/**
+					 * Return the current hardware pointer of the PCM device. Note that
+					 * it is only valid after the device is prepared.
+					 */
+					snd_pcm_uframes_t hardware_pointer() noexcept { return m_handle.ioplug.hw_ptr; }
+
+					/**
+					 * Return the current application pointer of the PCM device. Note that
+					 * it is only valid after the device is prepared.
+					 */
+					snd_pcm_uframes_t application_pointer() noexcept { return m_handle.ioplug.appl_ptr; }
+
+					/**
+					 * Return the used space (in frames) in the PCM device buffer. Note
+					 * that it is only valid after the device is prepared.
+					 */
+					snd_pcm_uframes_t buffer_used() noexcept;
+
+					/**
+					 * Return the free space (in frames) in the PCM device buffer. Note
+					 * that it is only valid after the device is prepared.
+					 */
+					snd_pcm_uframes_t buffer_free() noexcept;
+
+					/**
+					 * Return the mapped memory region of the PCM device. It is only
+					 * available when mmap flag is configured. Returns null when not
+					 * available.
+					 */
+					const snd_pcm_channel_area_t* mmap_area() noexcept { return snd_pcm_ioplug_mmap_areas(&m_handle.ioplug); }
+
+					/**
+					 * Move the PCM device to the given state.
+					 */
+					void set_state(snd_pcm_state_t state);
+
+					/**
+					 * Restrict the given hardware parameter to the given range. While
+					 * it can be called any time, it is only effective before the device
+					 * negotiates its hardware parameters.
+					 */
+					void set_parameter_range(int type, unsigned int min, unsigned int max);
+
+					/**
+					 * Restrict the given hardware parameter to the given list. While it
+					 * can be called any time, it is only effective before the device
+					 * negotiates its hardware parameters.
+					 */
+					void set_parameter_list(int type, unsigned int len, unsigned int* list);
+
+					/**
+					 * Clear all restrictions on hardware parameters. While it can be
+					 * called any time, it is only effective before the device negotiates
+					 * its hardware parameters.
+					 */
+					void reset_parameters() noexcept { snd_pcm_ioplug_params_reset(&m_handle.ioplug); }
+
+					/**
+					 * Convert a PCM device pointer to its buffer position. Note that
+					 * it is only valid after the device confirms its hardware
+					 * parameters.
+					 */
+					snd_pcm_uframes_t calculate_buffer_index(snd_pcm_uframes_t pointer) noexcept { return pointer % m_handle.ioplug.buffer_size; }
+
+					/**
+					 * Calculate the updated hardware pointer after the given increment.
+					 * The member function will throws invalid argument exception if the
+					 * increment is larger than the device buffer size. Note that it is
+					 * only valid after the device confirms its hardware parameters.
+					 */
+					snd_pcm_uframes_t calculate_next_hardware_pointer(snd_pcm_uframes_t increment);
+
+					Control(const Control& control) = delete;
+					Control(Control&& control) = delete;
+					Control& operator=(const Control& control) = delete;
+					Control& operator=(Control&& control) = delete;
+
+				private:
+
+					Handle& m_handle;
+
+			};
+
+			/**
+			 * Abstract base class for IOPlug implementation. When user applications
+			 * performs some operations on an IOPlug PCM device, callbacks from the
+			 * implementation class will be invoked to complete the operation.
+			 */
+			class Implementation
+			{
+				public:
+
+					/**
+					 * Empty virtual destructor to ensure proper destruction of derived
+					 * classes. 
+					 */
+					virtual ~Implementation() {}
 
 					/**
 					 * The method is called to setup the PCM device before its creation.
+					 * Both `name`, `stream` and `mode` parameters are passed from the
+					 * device constructor. The callback should update the `options`
+					 * parameter to setup the device.
 					 */
 					virtual void configure(const char* name, snd_pcm_stream_t stream, int mode, Options& options) {}
 
 					/**
 					 * The method is called to setup the PCM device after its creation.
+					 * This is the opportunity to configure the restrictions on hardware
+					 * parameters.
 					 */
-					virtual void create(IOPlug& ioplug) {}
+					virtual void create(Control& control) {}
 
 					/**
 					 * The method is called to apply new hardware parameters onto the PCM
 					 * device.
 					 */
-					virtual void hw_params(IOPlug& ioplug, snd_pcm_hw_params_t *params) {}
+					virtual void hw_params(Control& control, snd_pcm_hw_params_t *params) {}
 
 					/**
 					 * The method is called to clear existing hardware parameters on the PCM
 					 * device.
 					 */
-					virtual void hw_free(IOPlug& ioplug) {}
+					virtual void hw_free(Control& control) {}
 
 					/**
 					 * The method is called to apply new software parameters onto the PCM
 					 * device.
 					 */
-					virtual void sw_params(IOPlug& ioplug, snd_pcm_sw_params_t *params) {}
+					virtual void sw_params(Control& control, snd_pcm_sw_params_t *params) {}
 
 					/**
 					 * The method is called to prepare the PCM device for playback/capture.
 					 */
-					virtual void prepare(IOPlug& ioplug) {}
+					virtual void prepare(Control& control) {}
 
 					/**
 					 * The method is called to start playback/capture on the PCM device.
 					 */
-					virtual void start(IOPlug& ioplug) = 0;
+					virtual void start(Control& control) = 0;
 
 					/**
 					 * The method is called to stop playback/capture on the PCM device.
 					 */
-					virtual void stop(IOPlug& ioplug) = 0;
+					virtual void stop(Control& control) = 0;
 
 					/**
 					 * The method is called to finish off remaining audio data in the PCM
 					 * device buffer before playback/capture is over.
 					 */
-					virtual void drain(IOPlug& ioplug) {}
+					virtual void drain(Control& control) {}
 
 					/**
 					 * The method is called to pause current playback/capture on the PCM
 					 * device.
 					 */
-					virtual void pause(IOPlug& ioplug, int enable) {}
+					virtual void pause(Control& control, int enable) {}
 
 					/**
 					 * The method is called to resume the PCM device from suspension.
 					 */
-					virtual void resume(IOPlug& ioplug) {}
+					virtual void resume(Control& control) {}
 
 					/**
 					 * The method is called to report the number of file descriptors
 					 * application should poll for updates.
 					 */
-					virtual int poll_descriptors_count(IOPlug& ioplug) { return 0; }
+					virtual int poll_descriptors_count(Control& control) { return 0; }
 
 					/**
 					 * The method is called to report the list of file descriptors
 					 * application should poll for updates.
 					 */
-					virtual int poll_descriptors(IOPlug& ioplug, struct pollfd *pfd, unsigned int space) { return 0; }
+					virtual int poll_descriptors(Control& control, struct pollfd *pfd, unsigned int space) { return 0; }
 
 					/**
 					 * The method is called to process poll results and return the
 					 * actual event that happened: POLLIN indicates that the PCM device
 					 * can be read; POLLOUT indicates that the PCM device can be written.
 					 */
-					virtual void poll_revents(IOPlug& ioplug, struct pollfd *pfd, unsigned int nfds, unsigned short *revents) { *revents = 0; }
+					virtual void poll_revents(Control& control, struct pollfd *pfd, unsigned int nfds, unsigned short *revents) { *revents = 0; }
 
 					/**
 					 * The method is called to query current hardware buffer position of
 					 * the PCM device.
 					 */
-					virtual snd_pcm_uframes_t pointer(IOPlug& ioplug) = 0;
+					virtual snd_pcm_uframes_t pointer(Control& control) = 0;
 
 					/**
 					 * The method is called to transfer audio data from/into the PCM device
 					 * buffer.
 					 */
-					virtual snd_pcm_uframes_t transfer(IOPlug& ioplug, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size) { return 0; }
+					virtual snd_pcm_uframes_t transfer(Control& control, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size) { return 0; }
 
 					/**
 					 * The method is called to dump PCM device details to the output.
 					 */
-					virtual void dump(IOPlug& ioplug, snd_output_t* out) {}
+					virtual void dump(Control& control, snd_output_t* out) {}
 
 					/**
 					 * The method is called to report the PCM device latency, aka the
 					 * time between audio sample is written and it is played on the
 					 * physical hardware.
 					 */
-					virtual void delay(IOPlug& ioplug, snd_pcm_sframes_t *delayp) {}
+					virtual void delay(Control& control, snd_pcm_sframes_t *delayp) {}
 
 					/**
 					 * The method is called to release any resources used by the PCM device
 					 * on close.
 					 */
-					virtual void close(IOPlug& ioplug) {}
+					virtual void close(Control& control) {}
 
 			};
 
 			/**
-			 * Return the stream direction of the PCM device.
+			 * Construct a new IOPlug device.
 			 */
-			snd_pcm_stream_t stream() const noexcept { return m_data->ioplug.stream; }
+			IOPlug(const char* name, snd_pcm_stream_t stream, int mode, std::unique_ptr<Implementation>&& implementation);
 
 			/**
-			 * Return the stream direction of the PCM device.
+			 * Destruct this IOPlug device. The underlying device handle will be
+			 * destroyed if this instance still owns it. Otherwise, the destructor
+			 * does nothing.
 			 */
-			snd_pcm_state_t state() noexcept { return m_data->ioplug.state; }
+			~IOPlug();
 
 			/**
-			 * Return the current access mode of the PCM device. Note that it is only
-			 * valid after the device is configured.
+			 * Get the implementation of the IOPlug device. This member function
+			 * will work only before `release` is invoked on the instance. After
+			 * the `release` call, this function will throw exception.
 			 */
-			snd_pcm_access_t access() const noexcept { return m_data->ioplug.access; }
+			Implementation& implementation() const;
 
 			/**
-			 * Return the current format of the PCM device. Note that it is only valid
-			 * after the device is configured.
+			 * Hand over the ALSA snd_pcm_t pointer to the caller. After the call
+			 * this IOPlug instance will no long own the underlying device handle
+			 * and its use and disposal will be up to the caller.
 			 */
-			snd_pcm_format_t format() noexcept { return m_data->ioplug.format; }
-
-			/**
-			 * Return the current channels of the PCM device. Note that it is only
-			 * valid after the device is configured.
-			 */
-			unsigned int channels() noexcept { return m_data->ioplug.channels; }
-
-			/**
-			 * Return the current sampling rate of the PCM device. Note that it is
-			 * only valid after the device is configured.
-			 */
-			unsigned int rate() noexcept { return m_data->ioplug.rate; }
-
-			/**
-			 * Return the current period size (in frames) of the PCM device. Note that
-			 * it is only valid after the device is configured.
-			 */
-			snd_pcm_uframes_t period_size() noexcept { return m_data->ioplug.period_size; }
-
-			/**
-			 * Return the current buffer size (in frames) of the PCM device. Note that
-			 * it is only valid after the device is configured.
-			 */
-			snd_pcm_uframes_t buffer_size() noexcept { return m_data->ioplug.buffer_size; }
-
-			/**
-			 * Return the current boundary of the PCM device (in frames). The boundary
-			 * indicates the limits of hardware and application pointers. Wrap-around
-			 * will occur when any pointer exceeds the boundary.
-			 */
-			snd_pcm_uframes_t boundary() noexcept { return m_data->boundary; }
-
-			/**
-			 * Return the current hardware pointer of the PCM device.
-			 */
-			snd_pcm_uframes_t hardware_pointer() noexcept { return m_data->ioplug.hw_ptr; }
-
-			/**
-			 * Return the current application pointer of the PCM device.
-			 */
-			snd_pcm_uframes_t application_pointer() noexcept { return m_data->ioplug.appl_ptr; }
-
-			/**
-			 * Return the used space (in frames) in the PCM device buffer.
-			 */
-			snd_pcm_uframes_t buffer_used() noexcept;
-
-			/**
-			 * Return the free space (in frames) in the PCM device buffer.
-			 */
-			snd_pcm_uframes_t buffer_free() noexcept;
-
-			/**
-			 * Return the mapped memory region of the PCM device. It is only
-			 * available when mmap flag is configured. Returns null when not
-			 * available.
-			 */
-			const snd_pcm_channel_area_t* mmap_area() noexcept { return snd_pcm_ioplug_mmap_areas(&m_data->ioplug); }
-
-			/**
-			 * Return the callback handler of the PCM device.
-			 */
-			Handler* handler() noexcept { return m_handler.get(); }
-
-			/**
-			 * Move the PCM device to the given state.
-			 */
-			void set_state(snd_pcm_state_t state);
-
-			/**
-			 * Restrict the given hardware parameter to the given range.
-			 */
-			void set_parameter_range(int type, unsigned int min, unsigned int max);
-
-			/**
-			 * Restrict the given hardware parameter to the given list.
-			 */
-			void set_parameter_list(int type, unsigned int len, unsigned int* list);
-
-			/**
-			 * Clear all restrictions on hardware parameters.
-			 */
-			void reset_parameters() noexcept { snd_pcm_ioplug_params_reset(&m_data->ioplug); }
-
-			/**
-			 * Convert a PCM device pointer to its buffer position.
-			 */
-			snd_pcm_uframes_t calculate_buffer_index(snd_pcm_uframes_t pointer) noexcept { return pointer % m_data->ioplug.buffer_size; }
-
-			/**
-			 * Create a new PCM device.
-			 */
-			static snd_pcm_t* open(const char* name, snd_pcm_stream_t stream, int mode, std::unique_ptr<Handler>&& handler);
+			snd_pcm_t* release() noexcept;
 
 		private:
 
 			/**
-			 * Construct a new IOPlug object.
+			 * Pointer to the core IOPlug data. It should point to a valid device
+			 * handle after creation, but reset to nullptr after call to `release`
+			 * member function.
 			 */
-			IOPlug(std::unique_ptr<Data>&& data, std::unique_ptr<Handler>&& handler) : m_data(std::move(data)), m_handler(std::move(handler)) {}
-
-			std::unique_ptr<Data> m_data;
-			std::unique_ptr<Handler> m_handler;
+			Handle* m_handle;
 
 	};
 
 	/**
-	 * Exception thrown when ALSA subsystem encounters some error.
+	 * Returns an exception representing some common error.
 	 */
-	class BaseException : public std::system_error
+	inline std::system_error error(int errcode, const char* message) noexcept
 	{
-		public:
-			BaseException(const char* message, int errcode) : std::system_error(errcode, std::system_category(), message) {}
-			virtual ~BaseException() {}
-			int errcode() const noexcept { return code().value(); }
-	};
+		return std::system_error(errcode, std::system_category(), message);
+	}
 
 	/**
-	 * Exception thrown when device cannot be read from or written to.
+	 * Returns an exception representing input/output error.
 	 */
-	class IOException : public BaseException
+	inline std::system_error io_error() noexcept
 	{
-		public:
-			IOException() : BaseException("device IO error", -EIO) {}
-			virtual ~IOException() {}
-	};
+		return std::system_error(-EIO, std::system_category(), "device IO error");
+	}
 
 	/**
-	 * Exception thrown when device buffer has overrunned or underrunned.
+	 * Returns an exception representing buffer xrun.
 	 */
-	class XrunException : public BaseException
+	inline std::system_error xrun_error() noexcept
 	{
-		public:
-			XrunException() : BaseException("device buffer xrun", -EPIPE) {}
-			virtual ~XrunException() {}
-	};
+		return std::system_error(-EPIPE, std::system_category(), "device buffer xrun");
+	}
 
 	/**
-	 * Exception thrown when device is suspended.
+	 * Returns an exception representing device suspension.
 	 */
-	class SuspendedException : public BaseException
+	inline std::system_error suspended_error() noexcept
 	{
-		public:
-			SuspendedException() : BaseException("device suspended", -ESTRPIPE) {}
-			virtual ~SuspendedException() {}
-	};
+		return std::system_error(-ESTRPIPE, std::system_category(), "device suspended");
+	}
 
 	/**
-	 * Exception thrown when device is corrupted.
+	 * Returns an exception representing device disconnection.
 	 */
-	class CorruptedException : public BaseException
+	inline std::system_error disconnected_error() noexcept
 	{
-		public:
-			CorruptedException() : BaseException("device corrupted", -EBADF) {}
-			virtual ~CorruptedException() {}
-	};
+		return std::system_error(-ENODEV, std::system_category(), "device disconnected");
+	}
 
 	/**
-	 * Exception thrown when device is disconnected.
+	 * Returns an exception representing device corruption.
 	 */
-	class DisconnectedException : public BaseException
+	inline std::system_error corrupted_error() noexcept
 	{
-		public:
-			DisconnectedException() : BaseException("device disconnected", -ENOTTY) {}
-			virtual ~DisconnectedException() {}
-	};
+		return std::system_error(-EBADF, std::system_category(), "device corrupted");
+	}
 
 };
 
