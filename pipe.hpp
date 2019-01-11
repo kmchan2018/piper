@@ -230,12 +230,6 @@ namespace Piper
 			 * Create a new inlet into the given pipe. Throws concurrent session
 			 * exception when another outlet is created for the pipe.
 			 */
-			explicit Inlet(Pipe* pipe) : Inlet(*pipe) {}
-
-			/**
-			 * Create a new inlet into the given pipe. Throws concurrent session
-			 * exception when another outlet is created for the pipe.
-			 */
 			explicit Inlet(Pipe& pipe) : m_pipe(pipe), m_transport(pipe.m_transport), m_session(m_transport.begin()) {}
 
 			/**
@@ -314,11 +308,6 @@ namespace Piper
 		public:
 
 			typedef Transport::Position Position;
-
-			/**
-			 * Create a new outlet from the given pipe.
-			 */
-			explicit Outlet(Pipe* pipe) : Outlet(*pipe) {}
 
 			/**
 			 * Create a new outlet from the given pipe.
