@@ -6,10 +6,6 @@
 #include <vector>
 
 #include <alsa/asoundlib.h>
-#ifdef USE_PULSE
-#include <pulse/simple.h>
-#include <pulse/error.h>
-#endif
 
 #include "exception.hpp"
 #include "timestamp.hpp"
@@ -88,13 +84,6 @@ namespace Piper
 			 * Return the ALSA format code of the pipe.
 			 */
 			snd_pcm_format_t format_code_alsa() const noexcept;
-
-#ifdef USE_PULSE
-			/**
-			 * Return the Pulseaudio format code of the pipe.
-			 */
-			pa_sample_format_t format_code_alsa() const noexcept;
-#endif
 
 			/**
 			 * Return the channel of the pipe.
@@ -402,17 +391,6 @@ namespace Piper
 			Transport& m_transport;
 
 	};
-
-#ifdef USE_PULSE
-	/**
-	 * Thrown when the format is not supported.
-	 */
-	class UnsupportedFormatException : public Exception
-	{
-		public:
-			using Exception::Exception;
-	}
-#endif
 
 };
 

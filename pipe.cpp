@@ -218,28 +218,6 @@ namespace Piper
 		return snd_pcm_format_value(m_metadata.m_format);
 	}
 
-#ifdef USE_PULSE
-	pa_sample_format_t Pipe::format_code_pulse() const
-	{
-		switch (snd_pcm_format_value(m_metadata.m_format)) {
-			case SND_PCM_FORMAT_U8:       return PA_SAMPLE_U8;
-			case SND_PCM_FORMAT_S16_LE:   return PA_SAMPLE_S16LE;
-			case SND_PCM_FORMAT_S16_BE:   return PA_SAMPLE_S16BE;
-			case SND_PCM_FORMAT_FLOAT_LE: return PA_SAMPLE_FLOAT32LE;
-			case SND_PCM_FORMAT_FLOAT_BE: return PA_SAMPLE_FLOAT32BE;
-			case SND_PCM_FORMAT_A_LAW:    return PA_SAMPLE_ALAW;
-			case SND_PCM_FORMAT_MU_LAW:   return PA_SAMPLE_ULAW;
-			case SND_PCM_FORMAT_S32_LE:   return PA_SAMPLE_S32LE;
-			case SND_PCM_FORMAT_S32_BE:   return PA_SAMPLE_S32BE;
-			case SND_PCM_FORMAT_S24_3LE:  return PA_SAMPLE_S24LE;
-			case SND_PCM_FORMAT_S24_3BE:  return PA_SAMPLE_S24BE;
-			case SND_PCM_FORMAT_S24_LE:   return PA_SAMPLE_S24_32LE;
-			case SND_PCM_FORMAT_S24_BE:   return PA_SAMPLE_S24_32BE;
-			default: throw UnsupportedFormatException("unsupported format", "pipe.cpp", __LINE__);
-		}
-	}
-#endif
-
 	//////////////////////////////////////////////////////////////////////////
 	//
 	// Outlet implementation.
