@@ -15,7 +15,6 @@
 #include <utility>
 
 #include "alsa.hpp"
-#include "exception.hpp"
 #include "timestamp.hpp"
 #include "pipe.hpp"
 #include "signpost.hpp"
@@ -983,21 +982,30 @@ extern "C"
 				SNDERR("device %s cannot be initialized: device supports playback only", name);
 				return -EINVAL;
 			}
-		} catch (Piper::Exception& ex) {
-			SNDERR("device %s cannot be opened: %s from file %s line %d", name, ex.what(), ex.file(), ex.line());
-			return -EIO;
 		} catch (std::system_error& ex) {
 			int code = ex.code().value();
 			SNDERR("device %s cannot be opened: %s", name, ex.what());
 			return (code < 0 ? code : -code);
+		} catch (Piper::FileNotExistException& ex) {
+			SNDERR("device %s cannot be opened: pipe file cannot be found", name);
+			return -EINVAL;
+		} catch (Piper::PipeCorruptedException& ex) {
+			SNDERR("device %s cannot be opened: pipe file corrupted", name);
+			return -EINVAL;
+		} catch (Piper::PipeConcurrentInletException& ex) {
+			SNDERR("device %s cannot be opened: pipe file already in use", name);
+			return -EBUSY;
 		} catch (std::bad_alloc& ex) {
-			SNDERR("device %s cannot be opened: memory error");
+			SNDERR("device %s cannot be opened: memory allocation error", name);
 			return -ENOMEM;
 		} catch (std::invalid_argument& ex) {
-			SNDERR("device %s cannot be opened: invalid argument");
-			return -EINVAL;
+			SNDERR("device %s cannot be opened: logic error in underlying component", name);
+			return -EIO;
+		} catch (std::logic_error& ex) {
+			SNDERR("device %s cannot be opened: logic error in underlying component", name);
+			return -EIO;
 		} catch (...) {
-			SNDERR("device %s cannot be opened: unknown error");
+			SNDERR("device %s cannot be opened: unknown error", name);
 			return -EIO;
 		}
 	}

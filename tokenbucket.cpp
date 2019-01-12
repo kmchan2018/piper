@@ -6,11 +6,18 @@
 
 
 #include <algorithm>
+#include <cstring>
+#include <exception>
+#include <stdexcept>
 
 #include "exception.hpp"
 #include "timestamp.hpp"
 #include "timer.hpp"
 #include "tokenbucket.hpp"
+
+
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "tokenbucket.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "tokenbucket.cpp", __LINE__);
 
 
 namespace Piper
@@ -29,22 +36,34 @@ namespace Piper
 		m_tokens(0)
 	{
 		if (m_capacity == 0) {
-			throw InvalidArgumentException("invalid capacity", "tokenbucket.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::TokenBucket::TokenBucket] Cannot create token bucket due to invalid capacity"));
 		} else if (m_fill == 0) {
-			throw InvalidArgumentException("invalid fill", "tokenbucket.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::TokenBucket::TokenBucket] Cannot create token bucket due to invalid fill"));
 		}
 	}
 
 	void TokenBucket::start()
 	{
-		m_timer.start();
-		m_tokens = 0;
+		try {
+			m_timer.start();
+			m_tokens = 0;
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::TokenBucket::start] Cannot start token bucket due to logic error in underlying component"));
+		} catch (TimerException& ex) {
+			EXC_CHAIN(TokenBucketException("[Piper::TokenBucket::start] Cannot start token bucket due to timer error"));
+		}
 	}
 
 	void TokenBucket::stop()
 	{
-		m_timer.stop();
-		m_tokens = 0;
+		try {
+			m_timer.stop();
+			m_tokens = 0;
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::TokenBucket::stop] Cannot stop token bucket due to logic error in underlying component"));
+		} catch (TimerException& ex) {
+			EXC_CHAIN(TokenBucketException("[Piper::TokenBucket::stop] Cannot stop token bucket due to timer error"));
+		}
 	}
 
 	void TokenBucket::spend(unsigned int amount)
@@ -52,7 +71,7 @@ namespace Piper
 		if (m_tokens >= amount) {
 			m_tokens -= amount;
 		} else {
-			throw InvalidArgumentException("invalid amount", "tokenbucket.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::TokenBucket::spend] Cannot spend tokens due to overspend"));
 		}
 	}
 
@@ -72,7 +91,15 @@ namespace Piper
 	{
 		if (m_tokens == 0) {
 			if (m_timer.ticks() == 0) {
-				m_timer.try_accumulate(timeout);
+				try {
+					m_timer.try_accumulate(timeout);
+				} catch (std::invalid_argument& ex) {
+					EXC_CHAIN(std::logic_error("[Piper::TokenBucket::start] Cannot start token bucket due to invalid argument to underlying component"));
+				} catch (std::logic_error& ex) {
+					EXC_CHAIN(std::logic_error("[Piper::TokenBucket::try_refill] Cannot refill token bucket due to logic error in underlying component"));
+				} catch (TimerException& ex) {
+					EXC_CHAIN(TokenBucketException("[Piper::TokenBucket::try_refill] Cannot refill token bucket due to timer error"));
+				}
 			}
 
 			if (m_timer.ticks() > 0) {

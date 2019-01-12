@@ -4,9 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <exception>
 #include <vector>
+#include <stdexcept>
 
-#include "exception.hpp"
 #include "buffer.hpp"
 #include "file.hpp"
 
@@ -484,13 +485,41 @@ namespace Piper
 	};
 
 	/**
-	 * Exception indicating that the client wants to start a new update session
-	 * while another one is underway.
+	 * Exception thrown for any transport errors.
 	 */
-	class ConcurrentSessionException : public Exception
+	class TransportException : public std::runtime_error
 	{
 		public:
-			using Exception::Exception;
+			using std::runtime_error::runtime_error;
+	};
+
+	/**
+	 * Exception thrown for input/output operation failures on transport and
+	 * its backer file.
+	 */
+	class TransportIOException : public TransportException
+	{
+		public:
+			using TransportException::TransportException;
+	};
+
+	/**
+	 * Exception thrown for corrupted backer files.
+	 */
+	class TransportCorruptedException : public TransportException
+	{
+		public:
+			using TransportException::TransportException;
+	};
+
+	/**
+	 * Exception indicating that the client wants to start a new update session
+	 * in a transport while another one is underway.
+	 */
+	class TransportConcurrentSessionException : public TransportException
+	{
+		public:
+			using TransportException::TransportException;
 	};
 
 };

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <exception>
+#include <stdexcept>
 
 #include <signal.h>
 #include <unistd.h>
@@ -221,6 +222,31 @@ extern "C" void trigger_quit(int signum)
 
 
 /**
+ * Print a stack trace of the given exception to standard error stream.
+ * The function will walk the exception chain down to the root cause and
+ * print them out in that order.
+ */
+void print_exception(const std::exception& ex, bool initial = true)
+{
+	auto location = Support::Exception::location(ex);
+	auto cause = Support::Exception::cause(ex);
+	auto prefix = (initial ? "Exception:" : "> Caused by:");
+
+	std::fprintf(stderr, "%s %s at file %s line %d\n", prefix, ex.what(), location.file(), location.line());
+
+	if (cause) {
+		try {
+			std::rethrow_exception(cause);
+		} catch (std::exception& ex) {
+			print_exception(ex, false);
+		} catch (...) {
+			// don't care
+		}
+	}
+}
+
+
+/**
  * Feed pipe from the given device.
  */
 template<class Device, class ... Parameters> int do_feed(const char* path, Parameters ... args)
@@ -241,8 +267,9 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 				while (true) {
 					try {
 						operation.execute(pipe, input);
-					} catch (Piper::CaptureException& ex) {
-						std::fprintf(stderr, "WARN: feed restarted due to capture exception: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
+					} catch (Piper::DeviceCaptureException& ex) {
+						std::fprintf(stderr, "WARN: feed restarted due to capture exception\n");
+						print_exception(ex);
 					}
 				}
 			} catch (ReloadException& ex) {
@@ -251,13 +278,11 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 		}
 	} catch (QuitException& ex) {
 		return 0;
-	} catch (Piper::EOFException& ex) {
+	} catch (Piper::EndOfFileException& ex) {
 		return 0;
-	} catch (Piper::Exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot feed pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-		return 3;
 	} catch (std::exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot feed pipe: %s\n\n", ex.what());
+		std::fprintf(stderr, "ERROR: cannot feed pipe due to exception\n");
+		print_exception(ex);
 		return 3;
 	} catch (...) {
 		std::fprintf(stderr, "ERROR: cannot feed pipe\n\n");
@@ -290,9 +315,11 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 					try {
 						operation.execute(pipe, output);
 					} catch (Piper::DrainDataLossException& ex) {
-						std::fprintf(stderr, "WARN: drain restarted due to pipe buffer overrun: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
-					} catch (Piper::PlaybackException& ex) {
-						std::fprintf(stderr, "WARN: drain restarted due to playback exception: %s at file %s line %d\n", ex.what(), ex.file(), ex.line());
+						std::fprintf(stderr, "WARN: drain restarted due to pipe buffer overrun\n");
+						print_exception(ex);
+					} catch (Piper::DevicePlaybackException& ex) {
+						std::fprintf(stderr, "WARN: drain restarted due to playback exception\n");
+						print_exception(ex);
 					}
 				}
 			} catch (ReloadException& ex) {
@@ -301,11 +328,9 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 		}
 	} catch (QuitException& ex) {
 		return 0;
-	} catch (Piper::Exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot drain pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-		return 3;
 	} catch (std::exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot drain pipe: %s\n\n", ex.what());
+		std::fprintf(stderr, "ERROR: cannot drain pipe due to exception\n");
+		print_exception(ex);
 		return 3;
 	} catch (...) {
 		std::fprintf(stderr, "ERROR: cannot drain pipe\n\n");
@@ -349,11 +374,9 @@ int create(int argc, char **argv) {
 		try {
 			Piper::Pipe pipe(argv[2], format, channels, rate, period, readable, writable, separation, 0640);
 			return 0;
-		} catch (Piper::Exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-			return 3;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot create pipe due to exception\n");
+			print_exception(ex);
 			return 3;
 		}
 	} else {
@@ -424,11 +447,9 @@ int info(int argc, char **argv)
 			fprintf(stderr, "\n");
 
 			return 0;
-		} catch (Piper::Exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-			return 3;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot dump pipe due to exception\n");
+			print_exception(ex);
 			return 3;
 		}
 	} else {
@@ -508,11 +529,9 @@ int unclog(int argc, char **argv)
 			session = 0;
 
 			return 0;
-		} catch (Piper::Exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s at file %s line %d\n\n", ex.what(), ex.file(), ex.line());
-			return 3;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe: %s\n\n", ex.what());
+			std::fprintf(stderr, "ERROR: cannot unclog pipe due to exception\n");
+			print_exception(ex);
 			return 3;
 		}
 	} else {

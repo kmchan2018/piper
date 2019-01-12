@@ -1,8 +1,10 @@
 
 
+#include <exception>
+#include <stdexcept>
+
 #include <alsa/asoundlib.h>
 
-#include "exception.hpp"
 #include "buffer.hpp"
 #include "file.hpp"
 #include "pipe.hpp"
@@ -482,10 +484,20 @@ namespace Piper
 	 * Exception thrown the device cannot be operation upon due to some
 	 * permanent, unrecoverable reason like device removal.
 	 */
-	class DeviceException : public Exception
+	class DeviceException : public std::runtime_error
 	{
 		public:
-			using Exception::Exception;
+			using std::runtime_error::runtime_error;
+	};
+
+	/**
+	 * Exception thrown the device cannot be worked with due to some permanent,
+	 * unrecoverable reason like device corruption, removal, etc.
+	 */
+	class DeviceUnusableException : public DeviceException
+	{
+		public:
+			using DeviceException::DeviceException;
 	};
 
 	/**
@@ -493,10 +505,10 @@ namespace Piper
 	 * temporary reason like buffer underrun. The device should be able to
 	 * recover from the error by restarting the playback.
 	 */
-	class PlaybackException : public Exception
+	class DevicePlaybackException : public DeviceException
 	{
 		public:
-			using Exception::Exception;
+			using DeviceException::DeviceException;
 	};
 
 	/**
@@ -504,10 +516,10 @@ namespace Piper
 	 * temporary reason like buffer overrun. The device should be able to
 	 * recover from the error by restarting the capture.
 	 */
-	class CaptureException : public Exception
+	class DeviceCaptureException : public DeviceException
 	{
 		public:
-			using Exception::Exception;
+			using DeviceException::DeviceException;
 	};
 
 };

@@ -2,12 +2,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include <alsa/asoundlib.h>
 
-#include "exception.hpp"
 #include "timestamp.hpp"
 #include "buffer.hpp"
 #include "transport.hpp"
@@ -230,7 +231,7 @@ namespace Piper
 			 * Create a new inlet into the given pipe. Throws concurrent session
 			 * exception when another outlet is created for the pipe.
 			 */
-			explicit Inlet(Pipe& pipe) : m_pipe(pipe), m_transport(pipe.m_transport), m_session(m_transport.begin()) {}
+			explicit Inlet(Pipe& pipe);
 
 			/**
 			 * Destroy this inlet.
@@ -273,19 +274,19 @@ namespace Piper
 			/**
 			 * Return the preamble of the given staging block for update.
 			 */
-			Preamble& preamble(Position position) { return m_transport.input(m_session, position, 0).to_struct_reference<Preamble>(); }
+			Preamble& preamble(Position position);
 
 			/**
 			 * Return the content of the given staging block for update.
 			 */
-			Buffer content(Position position) { return m_transport.input(m_session, position, 1); }
+			Buffer content(Position position);
 
 			/**
 			 * Flush the first staging block. The staging block will be converted to
 			 * a cousmable block, and a new staging block will be appended to the
 			 * end of the pipe.
 			 */
-	    void flush() { return m_transport.flush(m_session); }
+	    void flush();
 
 			Inlet(const Inlet& inlet) = delete;
 			Inlet(Inlet&& inlet) = delete;
@@ -348,12 +349,12 @@ namespace Piper
 			/**
 			 * Return the preamble of the given staging block for update.
 			 */
-			const Preamble& preamble(Position position) const { return m_transport.view(position, 0).to_struct_reference<Preamble>(); }
+			const Preamble& preamble(Position position) const;
 
 			/**
 			 * Return the content of the given staging block for update.
 			 */
-			const Buffer content(Position position) const { return m_transport.view(position, 1); }
+			const Buffer content(Position position) const;
 
 			/**
 			 * Watch for next writes to the pipe. The method will return when the
@@ -379,6 +380,44 @@ namespace Piper
 			Pipe& m_pipe;
 			Transport& m_transport;
 
+	};
+
+	/**
+	 * Exception thrown when some error occured for the pipe.
+	 */
+	class PipeException : public std::runtime_error
+	{
+		public:
+			using std::runtime_error::runtime_error;
+	};
+
+	/**
+	 * Exception thrown when the pipe file is corrupted.
+	 */
+	class PipeCorruptedException : public PipeException
+	{
+		public:
+			using PipeException::PipeException;
+	};
+
+	/**
+	 * Exception thrown when there is an existing inlet for a pipe and attempt
+	 * is made to create another one.
+	 */
+	class PipeConcurrentInletException : public PipeException
+	{
+		public:
+			using PipeException::PipeException;
+	};
+
+	/**
+	 * Exception thrown when the outlet cannot watch a pipe for incoming
+	 * blocks.
+	 */
+	class PipeWatchException : public PipeException
+	{
+		public:
+			using PipeException::PipeException;
 	};
 
 };

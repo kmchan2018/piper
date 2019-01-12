@@ -8,7 +8,11 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <exception>
 #include <memory>
+#include <stdexcept>
+#include <system_error>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -20,6 +24,11 @@
 #include "buffer.hpp"
 #include "file.hpp"
 #include "transport.hpp"
+
+
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "transport.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "transport.cpp", __LINE__);
+#define EXC_SYSTEM(err) std::system_error(err, std::system_category(), strerror(err))
 
 
 namespace Piper
@@ -65,17 +74,17 @@ namespace Piper
 		m_total_size(align(m_metadata_offset + m_metadata_size, m_page_size))
 	{
 		if (m_slot_count < 2) {
-			throw InvalidArgumentException("invalid slot count", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid slot count"));
 		} else if (m_slot_count > UINT32_MAX) {
-			throw InvalidArgumentException("invalid slot count", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid slot count"));
 		} else if (m_component_count <= 0) {
-			throw InvalidArgumentException("invalid component count", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component count"));
 		} else if (m_component_count > MAX_COMPONENT_COUNT) {
-			throw InvalidArgumentException("invalid component count", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component count"));
 		} else if (m_metadata_size == 0) {
-			throw InvalidArgumentException("invalid metadata size", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid metadata size"));
 		} else if (m_metadata_size > UINT32_MAX) {
-			throw InvalidArgumentException("invalid metadata size", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid metadata size"));
 		}
 
 		Header header;
@@ -90,9 +99,9 @@ namespace Piper
 		for (unsigned int i = 0; i < m_component_count; i++) {
 			std::size_t component_size = components[i];
 			if (component_size == 0) {
-				throw InvalidArgumentException("invalid component size", "transport.cpp", __LINE__);
+				EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component size"));
 			} else if (component_size > UINT32_MAX) {
-				throw InvalidArgumentException("invalid component size", "transport.cpp", __LINE__);
+				EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component size"));
 			} else {
 				m_component_offsets[i] = m_total_size;
 				m_component_sizes[i] = header.component_sizes[i] = component_size;
@@ -105,12 +114,20 @@ namespace Piper
 			m_component_sizes[i] = header.component_sizes[i] = 0;
 		}
 
-		m_file.truncate(m_total_size);
-		m_file.seek(m_header_offset, SEEK_SET);
-		m_file.writeall(Buffer(&header));
-		m_file.seek(m_metadata_offset, SEEK_SET);
-		m_file.writeall(metadata);
-		m_file.flush();
+		try {
+			m_file.truncate(m_total_size);
+			m_file.seek(m_header_offset, SEEK_SET);
+			m_file.writeall(Buffer(&header));
+			m_file.seek(m_metadata_offset, SEEK_SET);
+			m_file.writeall(metadata);
+			m_file.flush();
+		} catch (std::invalid_argument& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::Backer::Backer] Cannot create new backer due to invalid argument to underlying component"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::Backer::Backer] Cannot create new backer due to logic error in underlying component"));
+		} catch (FileException& ex) {
+			EXC_CHAIN(TransportIOException("[Piper::Backer::Backer] Cannot create new backer due to input/output error"));
+		}
 	}
 
 	Backer::Backer(const char* path) :
@@ -126,20 +143,29 @@ namespace Piper
 		m_total_size(m_page_size)
 	{
 		Header header;
-		m_file.readall(Buffer(&header));
+
+		try {
+			m_file.readall(Buffer(&header));
+		} catch (std::invalid_argument& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::Backer::Backer] Cannot open existing backer due to invalid argument to underlying component"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::Backer::Backer] Cannot open existing backer due to logic error in underlying component"));
+		} catch (FileException& ex) {
+			EXC_CHAIN(TransportIOException("[Piper::Backer::Backer] Cannot open existing backer due to input/output error"));
+		}
 
 		if (header.version != VERSION) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		} else if (header.slot_count < 2) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		} else if (header.component_count == 0) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		} else if (header.component_count > MAX_COMPONENT_COUNT) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		} else if (header.page_size != m_page_size) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		} else if (header.metadata_size == 0) {
-			throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+			EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 		}
 
 		m_slot_count = header.slot_count;
@@ -150,7 +176,7 @@ namespace Piper
 		for (unsigned int i = 0; i < m_component_count; i++) {
 			std::size_t component_size = header.component_sizes[i];
 			if (component_size == 0) {
-				throw InvalidArgumentException("invalid channel file", "transport.cpp", __LINE__);
+				EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
 			} else {
 				m_component_offsets[i] = m_total_size;
 				m_component_sizes[i] = component_size;
@@ -167,9 +193,9 @@ namespace Piper
 	inline std::size_t Backer::component_offset(unsigned int slot, unsigned int component) const
 	{
 		if (slot >= m_slot_count) {
-			throw InvalidArgumentException("invalid slot", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::component_offset] Cannot obtain component offset due to invalid slot"));
 		} else if (component >= m_component_count) {
-			throw InvalidArgumentException("invalid component", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::component_offset] Cannot obtain component offset due to invalid component"));
 		} else {
 			return m_component_offsets[component] + slot * m_component_sizes[component];
 		}
@@ -178,7 +204,7 @@ namespace Piper
 	std::size_t Backer::component_size(unsigned int component) const
 	{
 		if (component >= m_component_count) {
-			throw InvalidArgumentException("invalid component", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Backer::component_size] Cannot obtain component offset due to invalid component"));
 		} else {
 			return m_component_sizes[component];
 		}
@@ -197,10 +223,10 @@ namespace Piper
 	{
 		if (m_pointer == MAP_FAILED) {
 			switch (errno) {
-				case EACCES: throw InvalidArgumentException("invalid file type", "transport.cpp", __LINE__);
-				case EBADF: throw InvalidArgumentException("invalid file descriptor", "transport.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid offset, size, flags or prot", "transport.cpp", __LINE__);
-				default: throw SystemException("cannot map memory", "transport.cpp", __LINE__);
+				case EACCES: EXC_START(std::logic_error("[Piper::Medium::Medium] Cannot map transport medium due to invalid type"));
+				case EBADF: EXC_START(std::logic_error("[Piper::Medium::Medium] Cannot map transport medium due to stale descriptor"));
+				case EINVAL: EXC_START(std::logic_error("[Piper::Medium::Medium] Cannot map transport medium due to invalid offset, size, flags or prot"));
+				default: EXC_START(EXC_SYSTEM(errno), TransportIOException("[Piper::Medium::Medium] Cannot map transport medium due to operating system error"));
 			}
 		}
 	}
@@ -255,16 +281,24 @@ namespace Piper
 
 	const Buffer Medium::component(unsigned int slot, unsigned int component) const
 	{
-		char* start = m_pointer + m_backer.component_offset(slot, component);
-		size_t size = m_backer.component_size(component);
-		return Buffer(start, size);
+		try {
+			char* start = m_pointer + m_backer.component_offset(slot, component);
+			size_t size = m_backer.component_size(component);
+			return Buffer(start, size);
+		} catch (std::invalid_argument& ex) {
+			EXC_CHAIN(std::invalid_argument("[Piper::Medium::component] Cannot obtain component buffer due to invalid argument"));
+		}
 	}
 
 	Buffer Medium::component(unsigned int slot, unsigned int component)
 	{
-		char* start = m_pointer + m_backer.component_offset(slot, component);
-		size_t size = m_backer.component_size(component);
-		return Buffer(start, size);
+		try {
+			char* start = m_pointer + m_backer.component_offset(slot, component);
+			size_t size = m_backer.component_size(component);
+			return Buffer(start, size);
+		} catch (std::invalid_argument& ex) {
+			EXC_CHAIN(std::invalid_argument("[Piper::Medium::component] Cannot obtain component buffer due to invalid argument"));
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -316,11 +350,15 @@ namespace Piper
 		Position start = (writes < m_readable ? 0 : writes - m_readable);
 
 		if (position < start) {
-			throw InvalidArgumentException("invalid position", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::view] Cannot obtain component view due to invalid position"));
 		} else if (position >= writes) {
-			throw InvalidArgumentException("invalid position", "transport.cpp", __LINE__);
-		} else {
+			EXC_START(std::invalid_argument("[Piper::Transport::view] Cannot obtain component view due to invalid position"));
+		}
+
+		try {
 			return m_medium.component(position % m_capacity, component);
+		} catch (std::invalid_argument& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::Transport::view] Cannot obtain component view due to invalid argument to underlying component"));
 		}
 	}
 
@@ -333,7 +371,7 @@ namespace Piper
 		if (result) {
 			return session;
 		} else {
-			throw ConcurrentSessionException("another session underway", "transport.cpp", __LINE__);
+			EXC_START(TransportConcurrentSessionException("[Piper::Transport::begin] Cannot start new session due to other concurrent session(s)"));
 		}
 	}
 
@@ -344,14 +382,18 @@ namespace Piper
 			Position until = writes + m_writable - 1;
 
 			if (position > until) {
-				throw InvalidArgumentException("invalid position", "transport.cpp", __LINE__);
+				EXC_START(std::invalid_argument("[Piper::Transport::input] Cannot obtain component buffer due to invalid position"));
 			} else if (position < writes) {
-				throw InvalidArgumentException("invalid position", "transport.cpp", __LINE__);
-			} else {
+				EXC_START(std::invalid_argument("[Piper::Transport::input] Cannot obtain component buffer due to invalid position"));
+			}
+
+			try {
 				return m_medium.component(position % m_capacity, component);
+			} catch (std::invalid_argument& ex) {
+				EXC_CHAIN(std::logic_error("[Piper::Transport::input] Cannot obtain component buffer due to invalid argument to underlying component"));
 			}
 		} else {
-			throw InvalidArgumentException("invalid session", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::input] Cannot obtain component buffer due to invalid session ID"));
 		}
 	}
 
@@ -360,23 +402,23 @@ namespace Piper
 		if (m_session.load(std::memory_order_acquire) == session) {
 			m_writes.fetch_add(Position(1), std::memory_order_release);
 		} else {
-			throw InvalidArgumentException("invalid session", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::flush] Cannot flush the transport due to invalid session ID"));
 		}
 	}
 
 	void Transport::finish(Session session)
 	{
 		if (m_session.compare_exchange_strong(session, INVALID_SESSION_ID, std::memory_order_release) == false) {
-			throw InvalidArgumentException("invalid session", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::finish] Cannot finish active session due to invalid session ID"));
 		}
 	}
 
 	void Transport::set_readable(unsigned int readable)
 	{
 		if (readable < 1) {
-			throw InvalidArgumentException("invalid readable", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::set_readable] Cannot set read window due to invalid window size"));
 		} else if (readable >= m_capacity) {
-			throw InvalidArgumentException("invalid readable", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::set_readable] Cannot set read window due to invalid window size"));
 		} else {
 			m_readable = readable;
 			m_writable = std::max(m_writable, m_capacity - m_readable);
@@ -386,9 +428,9 @@ namespace Piper
 	void Transport::set_writable(unsigned int writable)
 	{
 		if (writable < 1) {
-			throw InvalidArgumentException("invalid writable", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::set_writable] Cannot set write window due to invalid window size"));
 		} else if (writable >= m_capacity) {
-			throw InvalidArgumentException("invalid writable", "transport.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Transport::set_writable] Cannot set write window due to invalid window size"));
 		} else {
 			m_writable = writable;
 			m_readable = std::max(m_readable, m_capacity - m_writable);

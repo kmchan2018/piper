@@ -2,6 +2,9 @@
 
 #include <cstdio>
 #include <cstring>
+#include <exception>
+#include <stdexcept>
+#include <system_error>
 
 #include <errno.h>
 #include <unistd.h>
@@ -10,13 +13,27 @@
 #include "signpost.hpp"
 
 
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "signpost.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "signpost.cpp", __LINE__);
+#define EXC_SYSTEM(err) std::system_error(err, std::system_category(), strerror(err))
+
+
 namespace Piper
 {
+
+	//////////////////////////////////////////////////////////////////////////
+	//
+	// Signpost implementation.
+	//
+	//////////////////////////////////////////////////////////////////////////
 
 	SignPost::SignPost() : m_descriptors{-1,-1}, m_status(false)
 	{
 		if (::pipe(m_descriptors) < 0) {
-			throw SystemException("cannot create signpost", "signpost.cpp", __LINE__);
+			switch (errno) {
+				case EFAULT: EXC_START(std::logic_error("[Piper::SignPost::SignPost] Cannot create signpost due to unexpected error"));
+				default: EXC_START(EXC_SYSTEM(errno), SignPostException("[Piper::SignPost::SignPost] Cannot create signpost due to operating system error"));
+			}
 		}
 	}
 
@@ -37,8 +54,10 @@ namespace Piper
 				if (result > 0) {
 					m_status = true;
 					return;
+				} else if (result < 0 && errno == EBADF) {
+					EXC_START(std::logic_error("[Piper::SignPost::activate] Cannot activate signpost due to stale descriptor"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot activate the signpost", "signpost.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), SignPostException("[Piper::SignPost::activate] Cannot activate signpost due to operating system error"));
 				}
 			}
 		}
@@ -54,8 +73,10 @@ namespace Piper
 				if (result > 0) {
 					m_status = false;
 					return;
+				} else if (result < 0 && errno == EBADF) {
+					EXC_START(std::logic_error("[Piper::SignPost::deactivate] Cannot deactivate signpost due to stale descriptor"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot deactivate the signpost", "signpost.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), SignPostException("[Piper::SignPost::deactivate] Cannot deactivate signpost due to operating system error"));
 				}
 			}
 		}

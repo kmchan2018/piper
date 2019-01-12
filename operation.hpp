@@ -1,6 +1,8 @@
 
 
-#include "exception.hpp"
+#include <exception>
+#include <stdexcept>
+
 #include "buffer.hpp"
 #include "pipe.hpp"
 #include "device.hpp"
@@ -216,10 +218,10 @@ namespace Piper
 	 * Exception thrown when the draining operation cannot keep up with incoming
 	 * data from the pipe and data is lost.
 	 */
-	class DrainDataLossException : public Exception
+	class DrainDataLossException : public std::runtime_error
 	{
 		public:
-			using Exception::Exception;
+			using std::runtime_error::runtime_error;
 	};
 
 };

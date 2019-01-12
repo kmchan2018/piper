@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <exception>
 #include <memory>
+#include <stdexcept>
 #include <utility>
 
 #include "exception.hpp"
@@ -15,6 +17,8 @@
 
 namespace Piper
 {
+
+	using Support::Exception::start;
 
 	/**
 	 * Buffer is a value class that references a memory region. A buffer consists
@@ -42,9 +46,9 @@ namespace Piper
 			explicit Buffer(char* start, std::size_t size) : m_start(start), m_size(size)
 			{
 				if (start == nullptr) {
-					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::invalid_argument("[Piper::Buffer::Buffer] start should not be null"), "buffer.hpp", __LINE__);
 				} else if (size == 0) {
-					throw InvalidArgumentException("length should not be 0", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::invalid_argument("[Piper::Buffer::Buffer] length should not be 0"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -91,7 +95,7 @@ namespace Piper
 				m_size(sizeof(T))
 			{
 				if (start == nullptr) {
-					throw InvalidArgumentException("start should not be null", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::invalid_argument("[Piper::Buffer::Buffer] start should not be null"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -172,11 +176,11 @@ namespace Piper
 				std::size_t size = m_size;
 
 				if (std::align(alignof(T), sizeof(T), start, size) == nullptr) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else if (start != m_start) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else if (size != m_size) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else {
 					return reinterpret_cast<T*>(m_start);
 				}
@@ -191,11 +195,11 @@ namespace Piper
 				std::size_t size = m_size;
 
 				if (std::align(alignof(T), sizeof(T), start, size) == nullptr) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else if (start != m_start) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else if (size != m_size) {
-					throw AlignmentException("invalid struct type", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::logic_error("[Piper::Buffer::to_struct_pointer] Cannot cast buffer to struct due to misalignment"), "buffer.hpp", __LINE__);
 				} else {
 					return reinterpret_cast<T*>(m_start);
 				}
@@ -227,7 +231,7 @@ namespace Piper
 				if (offset < m_size) {
 					return m_start + offset;
 				} else {
-					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::at] offset should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -241,7 +245,7 @@ namespace Piper
 				if (offset < m_size) {
 					return m_start + offset;
 				} else {
-					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::at] offset should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -254,7 +258,7 @@ namespace Piper
 				if (size <= m_size) {
 					return Buffer(m_start, size);
 				} else {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::head] size should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -267,7 +271,7 @@ namespace Piper
 				if (size <= m_size) {
 					return Buffer(m_start, size);
 				} else {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::head] size should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -280,7 +284,7 @@ namespace Piper
 				if (size <= m_size) {
 					return Buffer(m_start + (m_size - size), size);
 				} else {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::tail] size should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -293,7 +297,7 @@ namespace Piper
 				if (size <= m_size) {
 					return Buffer(m_start + (m_size - size), size);
 				} else {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::tail] size should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -305,9 +309,9 @@ namespace Piper
 			const Buffer slice(std::size_t offset, std::size_t size) const
 			{
 				if (offset >= m_size) {
-					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::slice] offset should not exceed buffer size"), "buffer.hpp", __LINE__);
 				} else if (size > m_size - offset) {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::slice] size should not exceed available space in the buffer after the given offset"), "buffer.hpp", __LINE__);
 				} else {
 					return Buffer(m_start + offset, size);
 				}
@@ -321,9 +325,9 @@ namespace Piper
 			Buffer slice(std::size_t offset, std::size_t size)
 			{
 				if (offset >= m_size) {
-					throw InvalidArgumentException("invalid offset", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::slice] offset should not exceed buffer size"), "buffer.hpp", __LINE__);
 				} else if (size > m_size - offset) {
-					throw InvalidArgumentException("invalid size", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::slice] size should not exceed available space in the buffer after the given offset"), "buffer.hpp", __LINE__);
 				} else {
 					return Buffer(m_start + offset, size);
 				}
@@ -337,7 +341,7 @@ namespace Piper
 				if (index < m_size) {
 					return *(m_start + index);
 				} else {
-					throw InvalidArgumentException("invalid index", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::operator[]] index should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -349,7 +353,7 @@ namespace Piper
 				if (index < m_size) {
 					return *(m_start + index);
 				} else {
-					throw InvalidArgumentException("invalid index", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Buffer::operator[]] index should not exceed buffer size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -438,7 +442,7 @@ namespace Piper
 				if (consumed <= m_remainder) {
 					m_remainder -= consumed;
 				} else {
-					throw InvalidArgumentException("invalid consumed", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Source::consume] consumed should not exceed remainder size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -516,7 +520,7 @@ namespace Piper
 				if (consumed <= m_remainder) {
 					m_remainder -= consumed;
 				} else {
-					throw InvalidArgumentException("invalid consumed", "buffer.hpp", __LINE__);
+					Support::Exception::start(std::out_of_range("[Piper::Destination::consume] consumed should not exceed remainder size"), "buffer.hpp", __LINE__);
 				}
 			}
 
@@ -533,7 +537,7 @@ namespace Piper
 		if (destination.size() >= source.size()) {
 			std::memcpy(destination.start(), source.start(), source.size());
 		} else {
-			throw InvalidArgumentException("source too large", "buffer.hpp", __LINE__);
+			Support::Exception::start(std::invalid_argument("[Piper::copy] source too large"), "buffer.hpp", __LINE__);
 		}
 	}
 
@@ -545,7 +549,7 @@ namespace Piper
 		if (destination.size() >= sizeof(T)) {
 			std::memcpy(destination.start(), &source, sizeof(T));
 		} else {
-			throw InvalidArgumentException("source too large", "buffer.hpp", __LINE__);
+			Support::Exception::start(std::invalid_argument("[Piper::copy] source too large"), "buffer.hpp", __LINE__);
 		}
 	}
 
@@ -557,7 +561,7 @@ namespace Piper
 		if (destination.size() >= sizeof(T)) {
 			std::memcpy(destination.start(), reinterpret_cast<void*>(source), sizeof(T));
 		} else {
-			throw InvalidArgumentException("source too large", "buffer.hpp", __LINE__);
+			Support::Exception::start(std::invalid_argument("[Piper::copy] source too large"), "buffer.hpp", __LINE__);
 		}
 	}
 
@@ -569,7 +573,7 @@ namespace Piper
 		if (sizeof(T) >= source.size()) {
 			std::memcpy(reinterpret_cast<void*>(destination), source.start(), source.size());
 		} else {
-			throw InvalidArgumentException("source too large", "buffer.hpp", __LINE__);
+			Support::Exception::start(std::invalid_argument("[Piper::copy] source too large"), "buffer.hpp", __LINE__);
 		}
 	}
 

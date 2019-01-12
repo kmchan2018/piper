@@ -1,6 +1,8 @@
 
 
-#include "exception.hpp"
+#include <exception>
+#include <stdexcept>
+
 #include "timestamp.hpp"
 #include "timer.hpp"
 
@@ -153,6 +155,16 @@ namespace Piper
 			 * and capacity.
 			 */
 			unsigned int m_tokens;
+	};
+
+	/**
+	 * Exception thrown when operation on a token bucket failed due to some
+	 * run time error including any errors of the underlying timer.
+	 */
+	class TokenBucketException : public std::runtime_error
+	{
+		public:
+			using std::runtime_error::runtime_error;
 	};
 
 };

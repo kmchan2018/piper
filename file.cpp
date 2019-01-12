@@ -10,6 +10,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <stdexcept>
+#include <system_error>
 #include <utility>
 
 #include <errno.h>
@@ -22,6 +25,11 @@
 #include "exception.hpp"
 #include "buffer.hpp"
 #include "file.hpp"
+
+
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "file.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "file.cpp", __LINE__);
+#define EXC_SYSTEM(err) std::system_error(err, std::system_category(), strerror(err))
 
 
 namespace Piper
@@ -67,16 +75,16 @@ namespace Piper
 					} else if (m_descriptor == STDERR_FILENO) {
 						m_writable = true;
 					} else {
-						throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+						EXC_START(std::logic_error("[Piper::File::File] Cannot use descriptor due to unknown access mode"));
 					}
 				}
 			} else if (errno == EBADF) {
-				throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+				EXC_START(std::invalid_argument("[Piper::File::File] Cannot use descriptor due to invalid descriptor"));
 			} else {
-				throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+				EXC_START(EXC_SYSTEM(errno), std::invalid_argument("[Piper::File::File] Cannot use descriptor due to operating system error"));
 			}
 		} else {
-			throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::File::File] Cannot use descriptor due to invalid descriptor"));
 		}
 	}
 
@@ -88,13 +96,12 @@ namespace Piper
 	{
 		if (m_descriptor < 0) {
 			switch (errno) {
-				case ELOOP: throw InvalidArgumentException("invalid path", "file.cpp", __LINE__);
-				case ENAMETOOLONG: throw InvalidArgumentException("invalid path", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid flags", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("permission error", "file.cpp", __LINE__);
-				case EEXIST: throw SystemException("cannot create existing file", "file.cpp", __LINE__);
-				case ENOENT: throw SystemException("cannot open non-existing file", "file.cpp", __LINE__);
-				default: throw SystemException("cannot open file", "file.cpp", __LINE__);
+				case ELOOP: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to invalid path"));
+				case ENAMETOOLONG: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to oversize path"));
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to invalid flags"));
+				case EEXIST: EXC_START(FileExistException("[Piper::File::File] Cannot create existing file"));
+				case ENOENT: EXC_START(FileNotExistException("[Piper::File::File] cannot open non-existing file"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::File] Cannot open file due to operating system error"));
 			}
 		}
 	}
@@ -107,13 +114,12 @@ namespace Piper
 	{
 		if (m_descriptor < 0) {
 			switch (errno) {
-				case ELOOP: throw InvalidArgumentException("invalid path", "file.cpp", __LINE__);
-				case ENAMETOOLONG: throw InvalidArgumentException("invalid path", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid flags", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("permission error", "file.cpp", __LINE__);
-				case EEXIST: throw SystemException("cannot create existing file", "file.cpp", __LINE__);
-				case ENOENT: throw SystemException("cannot open non-existing file", "file.cpp", __LINE__);
-				default: throw SystemException("cannot open file", "file.cpp", __LINE__);
+				case ELOOP: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to invalid path"));
+				case ENAMETOOLONG: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to oversize path"));
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::File] Cannot open file due to invalid flags"));
+				case EEXIST: EXC_START(FileExistException("[Piper::File::File] Cannot create existing file"));
+				case ENOENT: EXC_START(FileNotExistException("[Piper::File::File] cannot open non-existing file"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::File] Cannot open file due to operating system error"));
 			}
 		}
 	}
@@ -136,10 +142,9 @@ namespace Piper
 			return result;
 		} else {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
-				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+				case EBADF: EXC_START(std::logic_error("[Piper::File::fcntl] Cannot fcntl file due to stale descriptor"));
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::fcntl] Cannot fcntl file due to invalid fcntl cmd"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::fcntl] Cannot fcntl file due to operating system error"));
 			}
 		}
 	}
@@ -158,10 +163,9 @@ namespace Piper
 			return result;
 		} else {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
-				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+				case EBADF: EXC_START(std::logic_error("[Piper::File::fcntl] Cannot fcntl file due to stale descriptor"));
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::fcntl] Cannot fcntl file due to invalid fcntl cmd"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::fcntl] Cannot fcntl file due to operating system error"));
 			}
 		}
 	}
@@ -177,10 +181,9 @@ namespace Piper
 			return result;
 		} else {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid cmd or arg", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("cannot fcntl descriptor due to permission", "file.cpp", __LINE__);
-				default: throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+				case EBADF: EXC_START(std::logic_error("[Piper::File::fcntl] Cannot fcntl file due to stale descriptor"));
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::fcntl] Cannot fcntl file due to invalid fcntl cmd"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::fcntl] Cannot fcntl file due to operating system error"));
 			}
 		}
 	}
@@ -193,11 +196,9 @@ namespace Piper
 			return std::uint64_t(result);
 		} else {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid origin", "file.cpp", __LINE__);
-				case ENXIO: throw InvalidArgumentException("invalid offset", "file.cpp", __LINE__);
-				case ESPIPE: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				default: throw SystemException("invalid offset", "file.cpp", __LINE__);
+				case EBADF: EXC_START(std::logic_error("[Piper::File::tell] Cannot check current position due to stale descriptor"));
+				case ESPIPE: EXC_START(FileNotSeekableException("[Piper::File::tell] Cannot check current position due to unseekable descriptor"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::tell] Cannot check current position due to operating system error"));
 			}
 		}
 	}
@@ -206,11 +207,11 @@ namespace Piper
 	{
 		if (lseek(m_descriptor, offset, origin) == -1) {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid origin", "file.cpp", __LINE__);
-				case ENXIO: throw InvalidArgumentException("invalid offset", "file.cpp", __LINE__);
-				case ESPIPE: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				default: throw SystemException("invalid offset", "file.cpp", __LINE__);
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::seek] Cannot seek file due to invalid offset or origin"));
+				case ENXIO: EXC_START(std::invalid_argument("[Piper::File::seek] Cannot seek file due to invalid offset or origin"));
+				case EBADF: EXC_START(std::logic_error("[Piper::File::seek] Cannot seek file due to stale descriptor"));
+				case ESPIPE: EXC_START(FileNotSeekableException("[Piper::File::seek] Cannot seek file due to unseekable descriptor"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::seek] Cannot seek file due to operating system error"));
 			}
 		}
 	}
@@ -222,6 +223,10 @@ namespace Piper
 
 	size_t File::read(Buffer&& buffer)
 	{
+		if (m_readable == false) {
+			EXC_START(FileNotReadableException("[Piper::File::read] Cannot read file due to open mode"));
+		}
+
 		void* start = buffer.start();
 		size_t size = buffer.size();
 		ssize_t done = ::read(m_descriptor, start, size);
@@ -235,11 +240,11 @@ namespace Piper
 		} else if (done < 0 && errno == EWOULDBLOCK) {
 			return 0;
 		} else if (done == 0) {
-			throw EOFException("cannot read past the end of file", "file.cpp", __LINE__);
-		} else if (errno == EPERM) {
-			throw PermissionException("cannot read data from file due to permission", "file.cpp", __LINE__);
+			EXC_START(EndOfFileException("[Piper::File::read] Cannot read past the end of file"));
+		} else if (done < 0 && errno == EBADF) {
+			EXC_START(std::logic_error("[Piper::File::read] Cannot read file due to stale descriptor"));
 		} else {
-			throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+			EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::read] Cannot read file due to operating system error"));
 		}
 	}
 
@@ -270,6 +275,10 @@ namespace Piper
 
 	void File::readall(Destination&& destination)
 	{
+		if (m_readable == false) {
+			EXC_START(FileNotReadableException("[Piper::File::readall] Cannot read file due to open mode"));
+		}
+
 		while (destination.remainder() > 0) {
 			if (m_blocking) {
 				read(destination);
@@ -290,11 +299,11 @@ namespace Piper
 				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
 					read(destination);
 				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
-					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+					EXC_START(std::logic_error("[Piper::File::readall] Cannot read file due to stale descriptor"));
 				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
-					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::readall] Cannot read file due to operating system error"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::readall] Cannot read file due to operating system error"));
 				}
 			}
 		}
@@ -317,8 +326,10 @@ namespace Piper
 
 	void File::try_readall(Destination&& destination, int timeout)
 	{
-		if (m_blocking && timeout >= 0) {
-			throw InvalidStateException("cannot read blocking descriptor with timeout", "file.cpp", __LINE__);
+		if (m_readable == false) {
+			EXC_START(FileNotReadableException("[Piper::File::try_readall] Cannot read file due to open mode"));
+		} else if (m_blocking && timeout >= 0) {
+			EXC_START(FileMayBlockException("[Piper::File::try_readall] Cannot read file due to possible blocking"));
 		}
 
 		if (destination.remainder() > 0) {
@@ -341,11 +352,11 @@ namespace Piper
 				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
 					read(destination);
 				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
-					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+					EXC_START(std::logic_error("[Piper::File::try_readall] Cannot read file due to stale descriptor"));
 				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
-					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::try_readall] Cannot read file due to operating system error"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot read data from file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::try_readall] Cannot read file due to operating system error"));
 				}
 			}
 		}
@@ -353,6 +364,10 @@ namespace Piper
 
 	size_t File::write(const Buffer& source)
 	{
+		if (m_writable == false) {
+			EXC_START(FileNotWritableException("[Piper::File::write] Cannot write file due to open mode"));
+		}
+
 		const char* start = source.start();
 		size_t size = source.size();
 		ssize_t done = ::write(m_descriptor, start, size);
@@ -366,11 +381,11 @@ namespace Piper
 		} else if (errno == EWOULDBLOCK) {
 			return 0;
 		} else if (errno == EPIPE) {
-			throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
-		} else if (errno == EPERM) {
-			throw PermissionException("cannot write data to file due to permission", "file.cpp", __LINE__);
+			EXC_START(EndOfFileException("[Piper::File::write] Cannot write file due to closed receiver side"));
+		} else if (errno == EBADF) {
+			EXC_START(std::logic_error("[Piper::File::write] Cannot write file due to stale descriptor"));
 		} else {
-			throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+			EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::write] Cannot write file due to operating system error"));
 		}
 	}
 
@@ -396,6 +411,10 @@ namespace Piper
 
 	void File::writeall(Source&& source)
 	{
+		if (m_writable == false) {
+			EXC_START(FileNotWritableException("[Piper::File::writeall] Cannot write file due to open mode"));
+		}
+
 		while (source.remainder() > 0) {
 			if (m_blocking) {
 				write(source);
@@ -413,14 +432,14 @@ namespace Piper
 
 				if (result > 0 && (pollfd.revents & POLLOUT) > 0) {
 					write(source);
-				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
-					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
 				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
-					throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
+					EXC_START(EndOfFileException("[Piper::File::writeall] Cannot write file due to closed receiver side"));
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					EXC_START(std::logic_error("[Piper::File::writeall] Cannot write file due to stale descriptor"));
 				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
-					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::writeall] Cannot write file due to operating system error"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::writeall] Cannot write file due to operating system error"));
 				}
 			}
 		}
@@ -443,8 +462,10 @@ namespace Piper
 
 	void File::try_writeall(Source&& source, int timeout)
 	{
-		if (m_blocking && timeout >= 0) {
-			throw InvalidStateException("cannot write blocking descriptor with timeout", "file.cpp", __LINE__);
+		if (m_writable == false) {
+			EXC_START(FileNotWritableException("[Piper::File::try_writeall] Cannot write file due to open mode"));
+		} else if (m_blocking && timeout >= 0) {
+			EXC_START(FileMayBlockException("[Piper::File::try_writeall] Cannot write file due to possible blocking"));
 		}
 
 		if (source.remainder() > 0) {
@@ -464,14 +485,14 @@ namespace Piper
 
 				if (result > 0 && (pollfd.revents & POLLOUT) > 0) {
 					write(source);
-				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
-					throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
 				} else if (result > 0 && (pollfd.revents & POLLHUP) > 0) {
-					throw EOFException("cannot write data to closed pipe/socket", "file.cpp", __LINE__);
+					EXC_START(EndOfFileException("[Piper::File::try_writeall] Cannot write file due to closed receiver side"));
+				} else if (result > 0 && (pollfd.revents & POLLNVAL) > 0) {
+					EXC_START(std::logic_error("[Piper::File::try_writeall] Cannot write file due to stale descriptor"));
 				} else if (result > 0 && (pollfd.revents & POLLERR) > 0) {
-					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::try_writeall] Cannot write file due to operating system error"));
 				} else if (result < 0 && errno != EINTR) {
-					throw SystemException("cannot write data to file", "file.cpp", __LINE__);
+					EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::try_writeall] Cannot write file due to operating system error"));
 				}
 			}
 		}
@@ -479,15 +500,16 @@ namespace Piper
 
 	void File::truncate(std::size_t length)
 	{
+		if (m_writable == false) {
+			EXC_START(FileNotWritableException("[Piper::File::truncate] Cannot truncate file due to open mode"));
+		}
+
 		if (::ftruncate(m_descriptor, length) < 0) {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EROFS: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case ETXTBSY: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid descriptor or length", "file.cpp", __LINE__);
-				case EFBIG: throw InvalidArgumentException("invalid length", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("cannot truncate the file due to permission", "file.cpp", __LINE__);
-				default: throw SystemException("cannot truncate the file", "file.cpp", __LINE__);
+				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::truncate] Cannot truncate file due to invalid length"));
+				case EFBIG: EXC_START(std::invalid_argument("[Piper::File::truncate] Cannot truncate file due to invalid length"));
+				case EBADF: EXC_START(std::logic_error("[Piper::File::truncate] Cannot truncate file due to stale descriptor"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::truncate] Cannot truncate file due to operating system error"));
 			}
 		}
 	}
@@ -496,11 +518,8 @@ namespace Piper
 	{
 		if (::fsync(m_descriptor) < 0) {
 			switch (errno) {
-				case EBADF: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EROFS: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EINVAL: throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
-				case EPERM: throw PermissionException("cannot flush the file due to permission", "file.cpp", __LINE__);
-				default: throw SystemException("cannot flush the file", "file.cpp", __LINE__);
+				case EBADF: EXC_START(std::logic_error("[Piper::File::flush] Cannot flush file due to stale descriptor"));
+				default: EXC_START(EXC_SYSTEM(errno), FileIOException("[Piper::File::flush] Cannot flush file due to operating system error"));
 			}
 		}
 	}

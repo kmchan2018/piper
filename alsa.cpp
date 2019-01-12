@@ -17,7 +17,6 @@
 #include <alsa/pcm_external.h>
 #include <alsa/pcm_ioplug.h>
 
-#include "exception.hpp"
 #include "alsa.hpp"
 
 

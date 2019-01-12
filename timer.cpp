@@ -5,6 +5,11 @@
 #define _BSD_SOURCE
 
 
+#include <cstring>
+#include <exception>
+#include <stdexcept>
+#include <system_error>
+
 #include <errno.h>
 #include <poll.h>
 #include <time.h>
@@ -14,6 +19,11 @@
 #include "exception.hpp"
 #include "timestamp.hpp"
 #include "timer.hpp"
+
+
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "timer.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "timer.cpp", __LINE__);
+#define EXC_SYSTEM(err) std::system_error(err, std::system_category(), strerror(err))
 
 
 namespace Piper
@@ -35,9 +45,12 @@ namespace Piper
 		m_remainder(sizeof(m_destination))
 	{
 		if (m_descriptor < 0) {
-			throw TimerException("cannot create timer", "timer.cpp", __LINE__);
+			switch (errno) {
+				case EINVAL: EXC_START(std::logic_error("[Piper::Timer::Timer] Cannot create timer due to unexpected error on clockid or flags"));
+				default: EXC_START(EXC_SYSTEM(errno), TimerException("Cannot create timer due to operating system error"));
+			}
 		} else if (m_period == 0) {
-			throw InvalidArgumentException("invalid period", "timer.cpp", __LINE__);
+			EXC_START(std::invalid_argument("[Piper::Timer::Timer] period cannot be zero"));
 		}
 	}
 
@@ -59,7 +72,12 @@ namespace Piper
 		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
 		} else {
-			throw TimerException("cannot start timer", "timer.cpp", __LINE__);
+			switch (errno) {
+				case EBADF: EXC_START(std::logic_error("[Piper::Timer::start] Cannot start timer due to stale descriptor"));
+				case EINVAL: EXC_START(std::logic_error("[Piper::Timer::start] Cannot start timer due to stale descriptor"));
+				case EFAULT: EXC_START(std::logic_error("[Piper::Timer::start] Cannot start timer due to unexpected error on itimerspec pointers"));
+				default: EXC_START(EXC_SYSTEM(errno), TimerException("[Piper::Timer::start] Cannot start timer due to operating system error"));
+			}
 		}
 	}
 
@@ -74,7 +92,12 @@ namespace Piper
 		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
 		} else {
-			throw TimerException("cannot stop timer", "timer.cpp", __LINE__);
+			switch (errno) {
+				case EBADF: EXC_START(std::logic_error("[Piper::Timer::stop] Cannot stop timer due to stale descriptor"));
+				case EINVAL: EXC_START(std::logic_error("[Piper::Timer::stop] Cannot stop timer due to stale descriptor"));
+				case EFAULT: EXC_START(std::logic_error("[Piper::Timer::stop] Cannot stop timer due to unexpected error on itimerspec pointers"));
+				default: EXC_START(EXC_SYSTEM(errno), TimerException("[Piper::Timer::stop] Cannot stop timer due to operating system error"));
+			}
 		}
 	}
 
@@ -141,14 +164,19 @@ namespace Piper
 					m_destination = nullptr;
 					m_consumed = 0;
 					m_remainder = sizeof(m_overrun);
-					throw TimerException("cannot check timer", "timer.cpp", __LINE__);
+
+					if (errno == EBADF) {
+						EXC_START(std::logic_error("Piper::Timer::try_accumulate] Cannot check timer due to stale descriptor"));
+					} else {
+						EXC_START(EXC_SYSTEM(errno), TimerException("[Piper::Timer::try_accumulate] Cannot check timer due to operating system error"));
+					}
 				}
 			} else if (available < 0 && errno != EINTR) {
 				m_overrun = 0;
 				m_destination = nullptr;
 				m_consumed = 0;
 				m_remainder = sizeof(m_overrun);
-				throw TimerException("cannot poll timer", "timer.cpp", __LINE__);
+				EXC_START(EXC_SYSTEM(errno), TimerException("[Piper::Timer::try_accumulate] Cannot check timer due to operating system error"));
 			}
 		}
 	}

@@ -3,8 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <stdexcept>
 
-#include "exception.hpp"
 #include "buffer.hpp"
 
 
@@ -402,21 +403,99 @@ namespace Piper
 	};
 
 	/**
-	 * Exception thrown when the file reaches its end.
+	 * Exception thrown when file operation fails.
 	 */
-	class EOFException : public Exception
+	class FileException : public std::runtime_error
 	{
 		public:
-			using Exception::Exception;
+			using std::runtime_error::runtime_error;
 	};
 
 	/**
-	 * Exception thrown when the file reaches its end while extra data is expected.
+	 * Exception thrown when a file exists when it is expected not to. It
+	 * can occur when creating a file.
 	 */
-	class PrematureEOFException : public EOFException
+	class FileExistException : public FileException
 	{
 		public:
-			using EOFException::EOFException;
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when a file does not exist when it is expected to. It
+	 * can occur when opening a file.
+	 */
+	class FileNotExistException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when a file does not support read operations over it.
+	 */
+	class FileNotReadableException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when a file does not support write operations over it.
+	 */
+	class FileNotWritableException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when the file does not support tell or seek operations
+	 * over it.
+	 */
+	class FileNotSeekableException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when the file operation may block causing it to violate
+	 * the expected timeout guarentee.
+	 */
+	class FileMayBlockException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when the file reaches its end.
+	 */
+	class EndOfFileException : public FileException
+	{
+		public:
+			using FileException::FileException;
+	};
+
+	/**
+	 * Exception thrown when the file reaches its end while more data is
+	 * expected.
+	 */
+	class PrematureEndOfFileException : public EndOfFileException
+	{
+		public:
+			using EndOfFileException::EndOfFileException;
+	};
+
+	/**
+	 * Exception thrown when the file does not support the given operation
+	 * like writing to a file that is opened for read only.
+	 */
+	class FileIOException : public FileException
+	{
+		public:
+			using FileException::FileException;
 	};
 
 };

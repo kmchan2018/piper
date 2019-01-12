@@ -2,8 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <stdexcept>
 
-#include "exception.hpp"
 #include "timestamp.hpp"
 
 
@@ -176,10 +177,10 @@ namespace Piper
 	 * internal timer to determine the elapsed time and the amount of tokens
 	 * to replenish. This exception represents some errors with that timer.
 	 */
-	class TimerException : public Exception
+	class TimerException : public std::runtime_error
 	{
 		public:
-			using Exception::Exception;
+			using std::runtime_error::runtime_error;
 	};
 
 };

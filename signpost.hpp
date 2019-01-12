@@ -1,5 +1,9 @@
 
 
+#include <exception>
+#include <stdexcept>
+
+
 #ifndef SIGNPOST_HPP_
 #define SIGNPOST_HPP_
 
@@ -96,6 +100,15 @@ namespace Piper
 			 */
 			bool m_status;
 
+	};
+
+	/**
+	 * Exception indicating problem with signpost.
+	 */
+	class SignPostException : public std::runtime_error
+	{
+		public:
+			using std::runtime_error::runtime_error;
 	};
 
 };

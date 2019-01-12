@@ -1,5 +1,7 @@
 
 
+#include <exception>
+
 #include "exception.hpp"
 #include "buffer.hpp"
 #include "pipe.hpp"
@@ -50,11 +52,6 @@ namespace Piper
 					cursor++;
 				}
 			}
-		} catch (Exception& ex) {
-			m_callback.on_end();
-			bucket.stop();
-			device.stop();
-			throw;
 		} catch (std::exception& ex) {
 			m_callback.on_end();
 			bucket.stop();
@@ -111,14 +108,9 @@ namespace Piper
 					bucket.spend(1);
 					cursor += 1;
 				} else {
-					throw DrainDataLossException("cursor behind outlet start", "operation.cpp", __LINE__);
+					Support::Exception::start(DrainDataLossException("[Piper::DrainOperation::execute] Cannot continue draining pipe due to cursor underrun"), "operation.cpp", __LINE__);
 				}
 			}
-		} catch (Exception& ex) {
-			m_callback.on_end();
-			bucket.stop();
-			device.stop();
-			throw;
 		} catch (std::exception& ex) {
 			m_callback.on_end();
 			bucket.stop();

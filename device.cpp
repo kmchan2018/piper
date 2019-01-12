@@ -2,6 +2,9 @@
 
 #include <cassert>
 #include <cstdio>
+#include <exception>
+#include <stdexcept>
+#include <system_error>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -13,6 +16,11 @@
 #include "file.hpp"
 #include "pipe.hpp"
 #include "device.hpp"
+
+
+#define EXC_START(...) Support::Exception::start(__VA_ARGS__, "device.cpp", __LINE__)
+#define EXC_CHAIN(...) Support::Exception::chain(__VA_ARGS__, "device.cpp", __LINE__);
+#define EXC_ALSA(err) std::system_error(err, std::system_category(), strerror(err))
 
 
 namespace Piper
@@ -31,17 +39,47 @@ namespace Piper
 
 	void StdoutPlaybackDevice::write(const Buffer buffer)
 	{
-		m_file.writeall(buffer);
+		try {
+			m_file.writeall(buffer);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdoutPlaybackDevice::write] Cannot write to device due to IO error"));
+		} catch (EndOfFileException& ex) {
+			EXC_CHAIN(DeviceUnusableException("[Piper::StdoutPlaybackDevice::write] Cannot write to device due to end of file"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::write] Cannot write to device due to unwritable stdout"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::write] Cannot write to device due to logic error in underlying component"));
+		}
 	}
 
 	void StdoutPlaybackDevice::try_write(Source& source)
 	{
-		m_file.try_writeall(source, -1);
+		try {
+			m_file.try_writeall(source, -1);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to IO error"));
+		} catch (EndOfFileException& ex) {
+			EXC_CHAIN(DeviceUnusableException("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to end of file"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to unwritable stdout"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to logic error in underlying component"));
+		}
 	}
 
 	void StdoutPlaybackDevice::try_write(Source& source, int timeout)
 	{
-		m_file.try_writeall(source, timeout);
+		try {
+			m_file.try_writeall(source, timeout);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to IO error"));
+		} catch (EndOfFileException& ex) {
+			EXC_CHAIN(DeviceUnusableException("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to end of file"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to unwritable stdout"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdoutPlaybackDevice::try_write] Cannot write to device due to logic error in underlying component"));
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -57,17 +95,41 @@ namespace Piper
 
 	void StdinCaptureDevice::read(Buffer buffer)
 	{
-		m_file.readall(buffer);
+		try {
+			m_file.readall(buffer);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdinCaptureDevice::read] Cannot read from device due to IO error"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to unreadable stdin"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to logic error in underlying component"));
+		}
 	}
 
 	void StdinCaptureDevice::try_read(Destination& destination)
 	{
-		m_file.try_readall(destination, -1);
+		try {
+			m_file.try_readall(destination, -1);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdinCaptureDevice::read] Cannot read from device due to IO error"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to unreadable stdin"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to logic error in underlying component"));
+		}
 	}
 
 	void StdinCaptureDevice::try_read(Destination& destination, int timeout)
 	{
-		m_file.try_readall(destination, timeout);
+		try {
+			m_file.try_readall(destination, timeout);
+		} catch (FileIOException& ex) {
+			EXC_CHAIN(DevicePlaybackException("[Piper::StdinCaptureDevice::read] Cannot read from device due to IO error"));
+		} catch (FileNotWritableException& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to unreadable stdin"));
+		} catch (std::logic_error& ex) {
+			EXC_CHAIN(std::logic_error("[Piper::StdinCaptureDevice::read] Cannot read from device due to logic error in underlying component"));
+		}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -93,32 +155,32 @@ namespace Piper
 				} else if (written == -EINTR) {
 					return 0;
 				} else if (written == -EPIPE) {
-					throw PlaybackException("cannot write to device due to buffer underrun", "device.cpp", __LINE__);
-				} else if (written == -EBADFD) {
-					throw PlaybackException("cannot write to device due to incorrect state", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-written), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to buffer underrun"));
 				} else if (written == -ESTRPIPE) {
-					throw PlaybackException("cannot write to device due to suspension", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-written), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to suspension"));
+				} else if (written == -EBADFD) {
+					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to corruption"));
 				} else if (written == -ENOTTY) {
-					throw DeviceException("cannot write to device due to disconnection", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 				} else if (written == -ENODEV) {
-					throw DeviceException("cannot write to device due to disconnection", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 				} else {
-					throw DeviceException("cannot write to device due to unknown reason", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device"));
 				}
 			} else if (err == -EINTR) {
 				return 0;
 			} else if (err == -EPIPE) {
-				throw PlaybackException("cannot write to device due to buffer underrun", "device.cpp", __LINE__);
-			} else if (err == -EBADFD) {
-				throw PlaybackException("cannot write to device due to incorrect state", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to buffer underrun"));
 			} else if (err == -ESTRPIPE) {
-				throw PlaybackException("cannot write to device due to suspension", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to suspension"));
+			} else if (err == -EBADFD) {
+				EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to corruption"));
 			} else if (err == -ENOTTY) {
-				throw DeviceException("cannot write to device due to disconnection", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 			} else if (err == -ENODEV) {
-				throw DeviceException("cannot write to device due to disconnection", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 			} else {
-				throw DeviceException("cannot write to device due to unknown reason", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device"));
 			}
 		}
 	}
@@ -128,9 +190,9 @@ namespace Piper
 		int err = 0;
 
 		if ((err = snd_pcm_open(&m_handle, name, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK)) < 0) {
-			throw InvalidArgumentException("cannot open device", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::AlsaPlaybackDevice] Cannot open device due to incorrect name"));
 		} else if ((err = snd_pcm_nonblock(m_handle, 2)) < 0) {
-			throw InvalidArgumentException("cannot update device to non-blocking", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::AlsaPlaybackDevice] Cannot switch device to non-blocking mode"));
 		}
 
 		m_frame_size = 0;
@@ -170,33 +232,33 @@ namespace Piper
 		snd_pcm_sw_params_alloca(&swparams);
 
 		if ((err = snd_pcm_hw_params_any(m_handle, hwparams)) < 0) {
-			throw DeviceException("cannot initialize device hardware parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot initialize hardware parameters"));
 		} else if ((err = snd_pcm_hw_params_set_rate_resample(m_handle, hwparams, 0)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on resampling", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on resampling"));
 		} else if ((err = snd_pcm_hw_params_set_access(m_handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on access mode", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on access mode"));
 		} else if ((err = snd_pcm_hw_params_set_format(m_handle, hwparams, pipe.format_code_alsa())) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on format", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on format"));
 		} else if ((err = snd_pcm_hw_params_set_channels(m_handle, hwparams, pipe.channels())) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on channels", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on channels"));
 		} else if ((err = snd_pcm_hw_params_set_rate(m_handle, hwparams, pipe.rate(), 0)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on rate", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on rate"));
 		} else if ((err = snd_pcm_hw_params_set_period_size_max(m_handle, hwparams, &device_period_size, &dir)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on period size", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on period size"));
 		} else if ((err = snd_pcm_hw_params_set_buffer_size_min(m_handle, hwparams, &device_buffer_size)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on buffer size", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure hardware parameters on buffer size"));
 		} else if ((err = snd_pcm_hw_params(m_handle, hwparams)) < 0) {
-			throw DeviceException("cannot commit device hardware parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot commit hardware parameters"));
 		}
 
 		if ((err = snd_pcm_sw_params_current(m_handle, swparams)) < 0) {
-			throw DeviceException("cannot initialize device software parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot initialize software parameters"));
 		} else if ((err = snd_pcm_sw_params_set_start_threshold(m_handle, swparams, device_period_size * 4)) < 0) {
-			throw DeviceException("cannot configure device software parameters on start threshold", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure software parameters on start threshold"));
 		} else if ((err = snd_pcm_sw_params_set_avail_min(m_handle, swparams, 1)) < 0) {
-			throw DeviceException("cannot configure device software parameters on minimum available space", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot configure software parameters on minimum available space"));
 		} else if ((err = snd_pcm_sw_params(m_handle, swparams)) < 0) {
-			throw DeviceException("cannot commit device software parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::configure] Cannot commit software parameters"));
 		}
 	}
 
@@ -206,13 +268,13 @@ namespace Piper
 		m_partial_size = 0;
 
 		if (err == -EBADFD) {
-			throw DeviceException("cannot prepare device due to incorrect state", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::start] Cannot prepare device due to corruption"));
 		} else if (err == -ENOTTY) {
-			throw DeviceException("cannot prepare device due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::start] Cannot prepare device due to disconnection"));
 		} else if (err == -ENODEV) {
-			throw DeviceException("cannot prepare device due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::start] Cannot prepare device due to disconnection"));
 		} else if (err < 0) {
-			throw DeviceException("cannot prepare device due to unknown reason", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::start] Cannot prepare device"));
 		}
 	}
 
@@ -222,13 +284,13 @@ namespace Piper
 		m_partial_size = 0;
 
 		if (err == -EBADFD) {
-			throw DeviceException("cannot stop playback due to incorrect state", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::stop] Cannot prepare device due to corruption"));
 		} else if (err == -ENOTTY) {
-			throw DeviceException("cannot stop playback due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::stop] Cannot prepare device due to disconnection"));
 		} else if (err == -ENODEV) {
-			throw DeviceException("cannot stop playback due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::stop] Cannot prepare device due to disconnection"));
 		} else if (err < 0) {
-			throw DeviceException("cannot stop playback due to unknown reason", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaPlaybackDevice::stop] Cannot prepare device due to ALSA error"));
 		}
 	}
 
@@ -303,32 +365,32 @@ namespace Piper
 				} else if (read == -EINTR) {
 					return 0;
 				} else if (read == -EPIPE) {
-					throw CaptureException("cannot read from device due to buffer overrun", "device.cpp", __LINE__);
-				} else if (read == -EBADFD) {
-					throw CaptureException("cannot read from device due to incorrect state", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to buffer underrun"));
 				} else if (read == -ESTRPIPE) {
-					throw CaptureException("cannot read from device due to suspension", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to suspension"));
+				} else if (read == -EBADFD) {
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to corruption"));
 				} else if (read == -ENOTTY) {
-					throw DeviceException("cannot read from device due to disconnection", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 				} else if (read == -ENODEV) {
-					throw DeviceException("cannot read from device due to disconnection", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 				} else {
-					throw DeviceException("cannot read from device due to unknown reason", "device.cpp", __LINE__);
+					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device"));
 				}
 			} else if (err == -EINTR) {
 				return 0;
 			} else if (err == -EPIPE) {
-				throw CaptureException("cannot read from device due to buffer overrun", "device.cpp", __LINE__);
-			} else if (err == -EBADFD) {
-				throw CaptureException("cannot read from device due to incorrect state", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to buffer underrun"));
 			} else if (err == -ESTRPIPE) {
-				throw CaptureException("cannot read from device due to suspension", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to suspension"));
+			} else if (err == -EBADFD) {
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to corruption"));
 			} else if (err == -ENOTTY) {
-				throw DeviceException("cannot read from device due to disconnection", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 			} else if (err == -ENODEV) {
-				throw DeviceException("cannot read from device due to disconnection", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 			} else {
-				throw DeviceException("cannot read from device due to unknown reason", "device.cpp", __LINE__);
+				EXC_START(EXC_ALSA(-err), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device"));
 			}
 		}
 	}
@@ -338,9 +400,9 @@ namespace Piper
 		int err = 0;
 
 		if ((err = snd_pcm_open(&m_handle, name, SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK)) < 0) {
-			throw InvalidArgumentException("cannot open device", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::AlsaCaptureDevice] Cannot open device"));
 		} else if ((err = snd_pcm_nonblock(m_handle, 2)) < 0) {
-			throw InvalidArgumentException("cannot update device to non-blocking", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::AlsaCaptureDevice] Cannot switch device to non-blocking mode"));
 		}
 
 		m_frame_size = 0;
@@ -380,23 +442,23 @@ namespace Piper
 		snd_pcm_sw_params_alloca(&swparams);
 
 		if ((err = snd_pcm_hw_params_any(m_handle, hwparams)) < 0) {
-			throw DeviceException("cannot initialize device hardware parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot initialize hardware parameters"));
 		} else if ((err = snd_pcm_hw_params_set_rate_resample(m_handle, hwparams, 0)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on resampling", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on resampling"));
 		} else if ((err = snd_pcm_hw_params_set_access(m_handle, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on access mode", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on access mode"));
 		} else if ((err = snd_pcm_hw_params_set_format(m_handle, hwparams, pipe.format_code_alsa())) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on format", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on format"));
 		} else if ((err = snd_pcm_hw_params_set_channels(m_handle, hwparams, pipe.channels())) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on channels", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on channels"));
 		} else if ((err = snd_pcm_hw_params_set_rate(m_handle, hwparams, pipe.rate(), 0)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on rate", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on rate"));
 		} else if ((err = snd_pcm_hw_params_set_period_size_max(m_handle, hwparams, &device_period_size, &dir)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on period size", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on period size"));
 		} else if ((err = snd_pcm_hw_params_set_buffer_size_min(m_handle, hwparams, &device_buffer_size)) < 0) {
-			throw DeviceException("cannot configure device hardware parameters on buffer size", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot configure hardware parameters on buffer size"));
 		} else if ((err = snd_pcm_hw_params(m_handle, hwparams)) < 0) {
-			throw DeviceException("cannot commit device hardware parameters", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::configure] Cannot commit hardware parameters"));
 		}
 	}
 
@@ -405,25 +467,25 @@ namespace Piper
 		int err1 = snd_pcm_prepare(m_handle);
 
 		if (err1 == -EBADFD) {
-			throw DeviceException("cannot prepare device due to incorrect state", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err1), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot prepare device due to corruption"));
 		} else if (err1 == -ENOTTY) {
-			throw DeviceException("cannot prepare device due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err1), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot prepare device due to disconnection"));
 		} else if (err1 == -ENODEV) {
-			throw DeviceException("cannot prepare device due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err1), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot prepare device due to disconnection"));
 		} else if (err1 < 0) {
-			throw DeviceException("cannot prepare device due to unknown reason", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err1), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot prepare device"));
 		}
 
 		int err2 = snd_pcm_start(m_handle);
 
 		if (err2 == -EBADFD) {
-			throw DeviceException("cannot start capture due to incorrect state", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err2), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot start device due to corruption"));
 		} else if (err2 == -ENOTTY) {
-			throw DeviceException("cannot start capture due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err2), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot start device due to disconnection"));
 		} else if (err2 == -ENODEV) {
-			throw DeviceException("cannot start capture due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err2), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot start device due to disconnection"));
 		} else if (err2 < 0) {
-			throw DeviceException("cannot start capture due to unknown reason", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err2), DeviceUnusableException("[Piper::AlsaCaptureDevice::start] Cannot start device"));
 		}
 
 		m_partial_size = 0;
@@ -435,13 +497,13 @@ namespace Piper
 		m_partial_size = 0;
 
 		if (err == -EBADFD) {
-			throw DeviceException("cannot stop capture due to incorrect state", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::stop] Cannot stop device due to corruption"));
 		} else if (err == -ENOTTY) {
-			throw DeviceException("cannot stop capture due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::stop] Cannot stop device due to disconnection"));
 		} else if (err == -ENODEV) {
-			throw DeviceException("cannot stop capture due to disconnection", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::stop] Cannot stop device due to disconnection"));
 		} else if (err < 0) {
-			throw DeviceException("cannot stop capture due to unknown reason", "device.cpp", __LINE__);
+			EXC_START(EXC_ALSA(-err), DeviceUnusableException("[Piper::AlsaCaptureDevice::stop] Cannot stop device"));
 		}
 	}
 
