@@ -31,6 +31,7 @@
  */
 volatile std::atomic_bool reload;
 
+
 /**
  * Flag for signalling program termination.
  */
@@ -49,6 +50,7 @@ class ReloadException : std::exception
 		const char* m_what;
 };
 
+
 /**
  * Exception for quit signal.
  */
@@ -59,6 +61,7 @@ class QuitException : std::exception {
 	private:
 		const char* m_what;
 };
+
 
 /**
  * Custom callback implementation for command line interface.
@@ -176,6 +179,17 @@ class Callback : public Piper::Callback
 			}
 		}
 
+		/**
+		 * Handle the end of operation by printing a new line to standard output
+		 * when tracking is active.
+		 */
+		void on_end() override
+		{
+			if (m_tracking) {
+				std::fprintf(stderr, "\n");
+			}
+		}
+
 	private:
 
 		/**
@@ -211,6 +225,7 @@ extern "C" void trigger_reload(int signum)
 {
 	reload = true;
 }
+
 
 /**
  * Signal handler for setting the quit flag.
@@ -344,7 +359,8 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 /**
  * Create a new pipe.
  */
-int create(int argc, char **argv) {
+int create(int argc, char **argv)
+{
 	if (argc >= 10) {
 		const char* format = argv[3];
 		Piper::Channel channels = std::atoi(argv[4]);
@@ -545,7 +561,8 @@ int unclog(int argc, char **argv)
 /**
  * Main program.
  */
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 	if (argc >= 2 && std::strcmp(argv[1], "create") == 0) {
 		return create(argc, argv);
 	} else if (argc >= 2 && std::strcmp(argv[1], "info") == 0) {
