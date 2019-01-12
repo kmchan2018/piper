@@ -56,6 +56,22 @@ namespace Piper
 			}
 
 			/**
+			 * Return whether the file is readable.
+			 */
+			bool readable() const noexcept
+			{
+				return m_readable;
+			}
+
+			/**
+			 * Return whether the file is writable.
+			 */
+			bool writable() const noexcept
+			{
+				return m_writable;
+			}
+
+			/**
 			 * Return the blocking mode of the descriptor.
 			 */
 			bool blocking() const noexcept
@@ -362,8 +378,27 @@ namespace Piper
 			File& operator=(File&& file) = delete;
 
 		private:
+
+			/**
+			 * Descriptor of the file.
+			 */
 			int m_descriptor;
+
+			/**
+			 * Whether the descriptor is opened for reading.
+			 */
+			bool m_readable;
+
+			/**
+			 * Whether the descriptor is opened for writing.
+			 */
+			bool m_writable;
+
+			/**
+			 * Whether the descriptor is operating in blocking mode.
+			 */
 			bool m_blocking;
+
 	};
 
 	/**

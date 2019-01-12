@@ -43,10 +43,22 @@ namespace Piper
 
 	File::File(int descriptor) :
 		m_descriptor(descriptor),
+		m_readable(false),
+		m_writable(false),
 		m_blocking(true)
 	{
-		if (descriptor >= 0) {
-			fcntl(F_GETFL);
+		if (m_descriptor >= 0) {
+			int result = ::fcntl(m_descriptor, F_GETFL);
+
+			if (result >= 0) {
+				m_readable = (0 != (result & (O_RDWR | O_RDONLY)));
+				m_writable = (0 != (result & (O_RDWR | O_WRONLY)));
+				m_blocking = (0 == (result & O_NONBLOCK));
+			} else if (errno == EBADF) {
+				throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+			} else {
+				throw SystemException("cannot fcntl descriptor", "file.cpp", __LINE__);
+			}
 		} else {
 			throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
 		}
@@ -54,6 +66,8 @@ namespace Piper
 
 	File::File(const char* path, int flags) :
 		m_descriptor(::open(path, flags)),
+		m_readable(0 != (flags & (O_RDWR | O_RDONLY))),
+		m_writable(0 != (flags & (O_RDWR | O_WRONLY))),
 		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
@@ -71,6 +85,8 @@ namespace Piper
 
 	File::File(const char* path, int flags, mode_t mode) :
 		m_descriptor(::open(path, flags, mode)),
+		m_readable(0 != (flags & (O_RDWR | O_RDONLY))),
+		m_writable(0 != (flags & (O_RDWR | O_WRONLY))),
 		m_blocking(0 == (flags & O_NONBLOCK))
 	{
 		if (m_descriptor < 0) {
