@@ -12,10 +12,6 @@
 #include <vector>
 
 #include <alsa/asoundlib.h>
-#ifdef USE_PULSE
-#include <pulse/simple.h>
-#include <pulse/error.h>
-#endif
 
 #include "exception.hpp"
 #include "timestamp.hpp"
