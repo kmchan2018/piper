@@ -54,6 +54,22 @@ namespace Piper
 				m_readable = (0 != (result & (O_RDWR | O_RDONLY)));
 				m_writable = (0 != (result & (O_RDWR | O_WRONLY)));
 				m_blocking = (0 == (result & O_NONBLOCK));
+
+				// For some reason, access mode detection can fail on stdin/stdout/stderr.
+				// In this case, we assign reasonable defaults for well-known descriptor,
+				// or fail for user defined ones.
+
+				if (m_readable == false && m_writable == false) {
+					if (m_descriptor == STDIN_FILENO) {
+						m_readable = true;
+					} else if (m_descriptor == STDOUT_FILENO) {
+						m_writable = true;
+					} else if (m_descriptor == STDERR_FILENO) {
+						m_writable = true;
+					} else {
+						throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
+					}
+				}
 			} else if (errno == EBADF) {
 				throw InvalidArgumentException("invalid descriptor", "file.cpp", __LINE__);
 			} else {
