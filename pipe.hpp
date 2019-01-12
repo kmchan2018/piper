@@ -236,20 +236,12 @@ namespace Piper
 			/**
 			 * Destroy this inlet.
 			 */
-			~Inlet()
-			{
-				m_transport.finish(m_session);
-			}
+			~Inlet() { m_transport.finish(m_session); }
 
 			/**
 			 * Return the pipe.
 			 */
 			const Pipe& pipe() const noexcept { return m_pipe; }
-
-			/**
-			 * Return the pipe.
-			 */
-			Pipe& pipe() noexcept { return m_pipe; }
 
 			/**
 			 * Return the session.
@@ -319,11 +311,6 @@ namespace Piper
 			 * Return the pipe.
 			 */
 			const Pipe& pipe() const noexcept { return m_pipe; }
-
-			/**
-			 * Return the pipe.
-			 */
-			Pipe& pipe() noexcept { return m_pipe; }
 
 			/**
 			 * Return the read window.
