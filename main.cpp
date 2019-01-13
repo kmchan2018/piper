@@ -284,7 +284,6 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 						operation.execute(pipe, input);
 					} catch (Piper::DeviceCaptureException& ex) {
 						std::fprintf(stderr, "WARN: feed restarted due to capture exception\n");
-						print_exception(ex);
 					}
 				}
 			} catch (ReloadException& ex) {
@@ -331,10 +330,8 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 						operation.execute(pipe, output);
 					} catch (Piper::DrainDataLossException& ex) {
 						std::fprintf(stderr, "WARN: drain restarted due to pipe buffer overrun\n");
-						print_exception(ex);
 					} catch (Piper::DevicePlaybackException& ex) {
 						std::fprintf(stderr, "WARN: drain restarted due to playback exception\n");
-						print_exception(ex);
 					}
 				}
 			} catch (ReloadException& ex) {
