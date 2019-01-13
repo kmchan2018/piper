@@ -54,7 +54,8 @@ class ReloadException : std::exception
 /**
  * Exception for quit signal.
  */
-class QuitException : std::exception {
+class QuitException : std::exception
+{
 	public:
 		QuitException(const char* what) : m_what(what) {}
 		const char* what() const noexcept { return m_what; }
