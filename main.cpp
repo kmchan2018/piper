@@ -25,6 +25,7 @@
 #include "device.hpp"
 #include "operation.hpp"
 #include "statistics.hpp"
+#include "config.h"
 
 
 using Support::Statistics::make_average;
@@ -605,6 +606,17 @@ int unclog(int argc, char **argv)
 
 
 /**
+ * Print program version.
+ */
+int version(int argc, char** argv)
+{
+	std::fprintf(stderr, "Piper version %d.%d.%d\n", PIPER_VERSION_MAJOR, PIPER_VERSION_MINOR, PIPER_VERSION_PATCH);
+	std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog|version <parameter>...\n\n", argv[0]);
+	return 0;
+}
+
+
+/**
  * Main program.
  */
 int main(int argc, char **argv)
@@ -619,12 +631,14 @@ int main(int argc, char **argv)
 		return drain(argc, argv);
 	} else if (argc >= 2 && std::strcmp(argv[1], "unclog") == 0) {
 		return unclog(argc, argv);
+	} else if (argc >= 2 && std::strcmp(argv[1], "version") == 0) {
+		return version(argc, argv);
 	} else if (argc >= 2) {
 		std::fprintf(stderr, "ERROR: Unknown subcommand %s\n", argv[1]);
-		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog|version <parameter>...\n\n", argv[0]);
 		return 1;
 	} else {
-		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog|version <parameter>...\n\n", argv[0]);
 		return 0;
 	}
 }
