@@ -288,10 +288,10 @@ void print_exception(const std::exception& ex, bool initial = true)
 template<class Device, class ... Parameters> int do_feed(const char* path, Parameters ... args)
 {
 	try {
-		signal(SIGTERM, trigger_quit);
-		signal(SIGINT, trigger_quit);
-		signal(SIGQUIT, trigger_quit);
-		signal(SIGHUP, trigger_reload);
+		::signal(SIGTERM, trigger_quit);
+		::signal(SIGINT, trigger_quit);
+		::signal(SIGQUIT, trigger_quit);
+		::signal(SIGHUP, trigger_reload);
 
 		while (true) {
 			Callback callback(true);
@@ -334,10 +334,10 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 template<class Device, class ... Parameters> int do_drain(const char* path, Parameters ... args)
 {
 	try {
-		signal(SIGTERM, trigger_quit);
-		signal(SIGINT, trigger_quit);
-		signal(SIGQUIT, trigger_quit);
-		signal(SIGHUP, trigger_reload);
+		::signal(SIGTERM, trigger_quit);
+		::signal(SIGINT, trigger_quit);
+		::signal(SIGQUIT, trigger_quit);
+		::signal(SIGHUP, trigger_reload);
 
 		while (true) {
 			Callback callback(true);
@@ -433,52 +433,52 @@ int info(int argc, char **argv)
 			const Piper::Medium& medium(transport.medium());
 			const Piper::Backer& backer(medium.backer());
 
-			fprintf(stderr, "\n");
-			fprintf(stderr, "  Pipe details\n");
-			fprintf(stderr, " ======================================================\n");
-			fprintf(stderr, "  Format: %s\n", pipe.format_name());
-			fprintf(stderr, "  Channels: %u\n", pipe.channels());
-			fprintf(stderr, "  Sampling Rate: %u\n", pipe.rate());
-			fprintf(stderr, "  Frame: %zu bytes\n", pipe.frame_size());
-			fprintf(stderr, "  Period: %zu bytes or %lu ns\n", pipe.period_size(), pipe.period_time());
-			fprintf(stderr, "  Readable: %u periods or %zu bytes or %lu ns\n", pipe.readable(), pipe.readable_size(), pipe.readable_time());
-			fprintf(stderr, "  Writable: %u periods or %zu bytes or %lu ns\n", pipe.writable(), pipe.writable_size(), pipe.writable_time());
-			fprintf(stderr, "  Capacity: %u periods or %zu bytes or %lu ns\n", pipe.capacity(), pipe.capacity_size(), pipe.capacity_time());
-			fprintf(stderr, "\n");
-			fprintf(stderr, "  Transport details\n");
-			fprintf(stderr, " ======================================================\n");
-			fprintf(stderr, "  Slot Count: %u\n", backer.slot_count());
-			fprintf(stderr, "  Component Count: %u\n", backer.component_count());
-			fprintf(stderr, "  Metadata Size: %zu\n", backer.metadata_size());
-			fprintf(stderr, "  Component Sizes: ");
+			std::fprintf(stderr, "\n");
+			std::fprintf(stderr, "  Pipe details\n");
+			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, "  Format: %s\n", pipe.format_name());
+			std::fprintf(stderr, "  Channels: %u\n", pipe.channels());
+			std::fprintf(stderr, "  Sampling Rate: %u\n", pipe.rate());
+			std::fprintf(stderr, "  Frame: %zu bytes\n", pipe.frame_size());
+			std::fprintf(stderr, "  Period: %zu bytes or %lu ns\n", pipe.period_size(), pipe.period_time());
+			std::fprintf(stderr, "  Readable: %u periods or %zu bytes or %lu ns\n", pipe.readable(), pipe.readable_size(), pipe.readable_time());
+			std::fprintf(stderr, "  Writable: %u periods or %zu bytes or %lu ns\n", pipe.writable(), pipe.writable_size(), pipe.writable_time());
+			std::fprintf(stderr, "  Capacity: %u periods or %zu bytes or %lu ns\n", pipe.capacity(), pipe.capacity_size(), pipe.capacity_time());
+			std::fprintf(stderr, "\n");
+			std::fprintf(stderr, "  Transport details\n");
+			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, "  Slot Count: %u\n", backer.slot_count());
+			std::fprintf(stderr, "  Component Count: %u\n", backer.component_count());
+			std::fprintf(stderr, "  Metadata Size: %zu\n", backer.metadata_size());
+			std::fprintf(stderr, "  Component Sizes: ");
 
 			for (unsigned int i = 0; i < backer.component_count(); i++) {
 				if (i == 0) {
-					fprintf(stderr, "%zu", backer.component_size(i));
+					std::fprintf(stderr, "%zu", backer.component_size(i));
 				} else {
-					fprintf(stderr, ", %zu", backer.component_size(i));
+					std::fprintf(stderr, ", %zu", backer.component_size(i));
 				}
 			}
 
-			fprintf(stderr, " bytes\n");
-			fprintf(stderr, "\n");
-			fprintf(stderr, "  Layout details\n");
-			fprintf(stderr, " ======================================================\n");
-			fprintf(stderr, "  Header Offset: %zu\n", backer.header_offset());
-			fprintf(stderr, "  Metadata Offset: %zu\n", backer.metadata_offset());
-			fprintf(stderr, "  Component Offsets: ");
+			std::fprintf(stderr, " bytes\n");
+			std::fprintf(stderr, "\n");
+			std::fprintf(stderr, "  Layout details\n");
+			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, "  Header Offset: %zu\n", backer.header_offset());
+			std::fprintf(stderr, "  Metadata Offset: %zu\n", backer.metadata_offset());
+			std::fprintf(stderr, "  Component Offsets: ");
 
 			for (unsigned int i = 0; i < backer.component_count(); i++) {
 				if (i == 0) {
-					fprintf(stderr, "%zu", backer.component_offset(0, i));
+					std::fprintf(stderr, "%zu", backer.component_offset(0, i));
 				} else {
-					fprintf(stderr, ", %zu", backer.component_offset(0, i));
+					std::fprintf(stderr, ", %zu", backer.component_offset(0, i));
 				}
 			}
 
-			fprintf(stderr, "\n");
-			fprintf(stderr, "  Total Size: %zu\n", backer.total_size());
-			fprintf(stderr, "\n");
+			std::fprintf(stderr, "\n");
+			std::fprintf(stderr, "  Total Size: %zu\n", backer.total_size());
+			std::fprintf(stderr, "\n");
 
 			return 0;
 		} catch (std::exception& ex) {
@@ -507,11 +507,11 @@ int feed(int argc, char **argv)
 
 	if (argc == 3) {
 		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "-") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "-") == 0) {
 		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "stdin") == 0) {
 		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "alsa") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "alsa") == 0) {
 		return do_feed<Piper::AlsaCaptureDevice>(argv[2], "default");
 	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
 		return do_feed<Piper::AlsaCaptureDevice>(argv[2], argv[3] + 5);
@@ -535,11 +535,11 @@ int drain(int argc, char **argv)
 
 	if (argc == 3) {
 		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "-") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "-") == 0) {
 		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "stdin") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "stdin") == 0) {
 		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && strcmp(argv[3], "alsa") == 0) {
+	} else if (argc == 4 && std::strcmp(argv[3], "alsa") == 0) {
 		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], "default");
 	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
 		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], argv[3] + 5);
