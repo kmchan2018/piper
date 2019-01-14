@@ -24,6 +24,14 @@
 #include "tokenbucket.hpp"
 #include "device.hpp"
 #include "operation.hpp"
+#include "statistics.hpp"
+
+
+using Support::Statistics::make_average;
+using Support::Statistics::make_filter;
+using Support::Statistics::make_magnitude;
+using Support::Statistics::make_divergence;
+using Support::Statistics::make_delta;
 
 
 /**
@@ -72,39 +80,81 @@ class Callback : public Piper::Callback
 	public:
 
 		/**
-		 * Initialize the variables.
+		 * Type code for feed operation.
 		 */
-		explicit Callback() : m_tracking(false) {}
+		const static int FEED = 1;
 
 		/**
-		 * Disable tracking for drain operations.
+		 * Type code for drain operation.
 		 */
-		void on_begin_feed(const Piper::Pipe& pipe, const Piper::CaptureDevice& device)
+		const static int DRAIN = 2;
+
+		/**
+		 * Initialize the variables.
+		 */
+		explicit Callback() :
+			m_tracking(false),
+			m_operation(0),
+			m_write_period_value(make_delta(make_filter(make_average()))),
+			m_write_period_jitter(make_delta(make_filter(make_divergence(make_average())))),
+			m_transfer_delay_value(make_filter(make_average())),
+			m_transfer_delay_jitter(make_filter(make_delta(make_magnitude(make_average()))))
 		{
-			m_tracking = false;
+			// do nothing
 		}
 
 		/**
-		 * Initialize tracking for drain operations.
+		 * Initialize the variables.
+		 */
+		explicit Callback(bool tracking) :
+			m_tracking(tracking),
+			m_operation(0),
+			m_write_period_value(make_delta(make_filter(make_average()))),
+			m_write_period_jitter(make_delta(make_filter(make_divergence(make_average())))),
+			m_transfer_delay_value(make_filter(make_average())),
+			m_transfer_delay_jitter(make_filter(make_delta(make_magnitude(make_average()))))
+		{
+			// do nothing
+		}
+
+		/**
+		 * Initialize tracking for feed operations if tracking is enabled. It
+		 * involves setting up the parameters and counters used for statistics
+		 * computation.
+		 */
+		void on_begin_feed(const Piper::Pipe& pipe, const Piper::CaptureDevice& device)
+		{
+			if (m_tracking) {
+				double period = timestamp(pipe.period_time());
+				int count = int(1000.0 / period);
+
+				m_operation = FEED;
+				m_period = period;
+				m_first = true;
+				m_write_period_value = make_delta(make_filter(make_average(count), 0.0, 10000.0));
+				m_write_period_jitter = make_delta(make_filter(make_divergence(make_average(count), m_period), 0.0, 10000.0));
+			}
+		}
+
+		/**
+		 * Initialize tracking for drain operations if tracking is enabled. It
+		 * involves setting up the parameters and counters used for statistics
+		 * computation.
 		 */
 		void on_begin_drain(const Piper::Pipe& pipe, const Piper::PlaybackDevice& device)
 		{
-			const double period = timestamp(pipe.period_time());
+			if (m_tracking) {
+				double period = timestamp(pipe.period_time());
+				int count = int(1000.0 / period);
 
-			m_tracking = true;
-			m_alpha = 2.0 / (1000.0 / period + 1.0);
-			m_remainder = 1.0 - m_alpha;
-			m_previous = std::nan("1");
-			m_source_delay_expectation = period;
-			m_source_delay_average = std::nan("1");
-			m_source_delay_max = std::nan("1");
-			m_source_jitter_average = std::nan("1");
-			m_source_jitter_max = std::nan("1");
-			m_pipe_delay_expectation = period / 2.0;
-			m_pipe_delay_average = std::nan("1");
-			m_pipe_delay_max = std::nan("1");
-			m_pipe_jitter_average = std::nan("1");
-			m_pipe_jitter_max = std::nan("1");
+				m_operation = DRAIN;
+				m_period = period;
+				m_first = true;
+				m_write_period_value = make_delta(make_filter(make_average(count), 0.0, 10000.0));
+				m_write_period_jitter = make_delta(make_filter(make_divergence(make_average(count), m_period), 0.0, 10000.0));
+				m_transfer_delay_value = make_filter(make_average(count), 0.0, 10000.0);
+				m_transfer_delay_jitter = make_filter(make_delta(make_magnitude(make_average(count))), 0.0, 10000.0);
+			}
 		}
 
 		/**
@@ -115,51 +165,38 @@ class Callback : public Piper::Callback
 			if (m_tracking) {
 				const double now = timestamp(Piper::now());
 				const double current = timestamp(preamble.timestamp);
-				const double previous = m_previous;
+				const bool first = m_first;
 
-				m_previous = current;
+				m_first = false;
+				m_write_period_value.consume(current);
+				m_write_period_jitter.consume(current);
 
-				const double pipe_delay = now - current;
-				const double pipe_jitter = abs(pipe_delay - m_pipe_delay_expectation);
-
-				if (pipe_delay < 10000.0) {
-					if (std::isnan(m_pipe_delay_average) == false) {
-						m_pipe_delay_average = m_alpha * pipe_delay + m_remainder * m_pipe_delay_average;
-						m_pipe_delay_max = std::max(pipe_delay, m_pipe_delay_max);
-						m_pipe_jitter_average = m_alpha * pipe_jitter + m_remainder * m_pipe_jitter_average;
-						m_pipe_jitter_max = std::max(pipe_jitter, m_pipe_jitter_max);
-					} else {
-						m_pipe_delay_average = pipe_delay;
-						m_pipe_delay_max = pipe_delay;
-						m_pipe_jitter_average = pipe_jitter;
-						m_pipe_jitter_max = pipe_jitter;
-					}
+				if (m_operation == DRAIN) {
+					m_transfer_delay_value.consume(now - current);
+					m_transfer_delay_jitter.consume(now - current);
 				}
 
-				if (std::isnan(previous) == false) {
-					const double source_delay = current - previous;
-					const double source_jitter = abs(source_delay - m_source_delay_expectation);
-
-					if (source_delay < 10000.0) {
-						if (std::isnan(m_source_delay_average) == false) {
-							m_source_delay_average = m_alpha * source_delay + m_remainder * m_source_delay_average;
-							m_source_delay_max = std::max(source_delay, m_source_delay_max);
-							m_source_jitter_average = m_alpha * source_jitter + m_remainder * m_source_jitter_average;
-							m_source_jitter_max = std::max(source_jitter, m_source_jitter_max);
-						} else {
-							m_source_delay_average = source_delay;
-							m_source_delay_max = source_delay;
-							m_source_jitter_average = source_jitter;
-							m_source_jitter_max = source_jitter;
-						}
-					}
+				if (m_operation == FEED && first) {
+					std::fprintf(stderr, "INFO: Statistics     |       Reference        Measured       Variation\n");
+					std::fprintf(stderr, "INFO: ---------------+-------------------------------------------------\n");
+					std::fprintf(stderr, "INFO: Write Period   |%16.3f%16.3f%16.3f\n", m_period, m_write_period_value.value(), m_write_period_jitter.value());
+				} else if (m_operation == DRAIN && first) {
+					std::fprintf(stderr, "INFO: Statistics     |       Reference        Measured       Variation\n");
+					std::fprintf(stderr, "INFO: ---------------+-------------------------------------------------\n");
+					std::fprintf(stderr, "INFO: Write Period   |%16.3f%16.3f%16.3f\n", m_period, m_write_period_value.value(), m_write_period_jitter.value());
+					std::fprintf(stderr, "INFO: Transfer Delay |%16.3f%16.3f%16.3f\n", m_period, m_transfer_delay_value.value(), m_transfer_delay_jitter.value());
+				} else if (m_operation == FEED) {
+					std::fprintf(stderr, "\x1b[3A\x1b[2K\x1b[1G");
+					std::fprintf(stderr, "INFO: Statistics     |       Reference        Measured       Variation\n");
+					std::fprintf(stderr, "INFO: ---------------+-------------------------------------------------\n");
+					std::fprintf(stderr, "INFO: Write Period   |%16.3f%16.3f%16.3f\n", m_period, m_write_period_value.value(), m_write_period_jitter.value());
+				} else if (m_operation == DRAIN) {
+					std::fprintf(stderr, "\x1b[4A\x1b[2K\x1b[1G");
+					std::fprintf(stderr, "INFO: Statistics     |       Reference        Measured       Variation\n");
+					std::fprintf(stderr, "INFO: ---------------+-------------------------------------------------\n");
+					std::fprintf(stderr, "INFO: Write Period   |%16.3f%16.3f%16.3f\n", m_period, m_write_period_value.value(), m_write_period_jitter.value());
+					std::fprintf(stderr, "INFO: Transfer Delay |%16.3f%16.3f%16.3f\n", m_period, m_transfer_delay_value.value(), m_transfer_delay_jitter.value());
 				}
-
-				std::fprintf(stderr, "\x1b[2K\x1b[1GDEBUG: source: delay=(%5.3f, %5.3f), jitter=(%5.3f, %5.3f), pipe: delay=(%5.3f, %5.3f), jitter=(%5.3f, %5.3f)",
-					m_source_delay_average, m_source_delay_max,
-					m_source_jitter_average, m_source_jitter_max,
-					m_pipe_delay_average, m_pipe_delay_max,
-					m_pipe_jitter_average, m_pipe_jitter_max);
 			}
 		}
 
@@ -180,17 +217,6 @@ class Callback : public Piper::Callback
 			}
 		}
 
-		/**
-		 * Handle the end of operation by printing a new line to standard output
-		 * when tracking is active.
-		 */
-		void on_end() override
-		{
-			if (m_tracking) {
-				std::fprintf(stderr, "\n");
-			}
-		}
-
 	private:
 
 		/**
@@ -202,19 +228,13 @@ class Callback : public Piper::Callback
 		}
 
 		bool m_tracking;
-		double m_alpha;
-		double m_remainder;
-		double m_previous;
-		double m_source_delay_expectation;
-		double m_source_delay_average;
-		double m_source_delay_max;
-		double m_source_jitter_average;
-		double m_source_jitter_max;
-		double m_pipe_delay_expectation;
-		double m_pipe_delay_average;
-		double m_pipe_delay_max;
-		double m_pipe_jitter_average;
-		double m_pipe_jitter_max;
+		int m_operation;
+		double m_period;
+		bool m_first;
+		decltype(make_delta(make_filter(make_average()))) m_write_period_value;
+		decltype(make_delta(make_filter(make_divergence(make_average())))) m_write_period_jitter;
+		decltype(make_filter(make_average())) m_transfer_delay_value;
+		decltype(make_filter(make_delta(make_magnitude(make_average())))) m_transfer_delay_jitter;
 
 };
 
@@ -274,7 +294,7 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 		signal(SIGHUP, trigger_reload);
 
 		while (true) {
-			Callback callback;
+			Callback callback(true);
 			Piper::FeedOperation operation(callback);
 			Piper::Pipe pipe(path);
 			Device input(args...);
@@ -320,7 +340,7 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 		signal(SIGHUP, trigger_reload);
 
 		while (true) {
-			Callback callback;
+			Callback callback(true);
 			Piper::DrainOperation operation(callback);
 			Piper::Pipe pipe(path);
 			Device output(args...);
