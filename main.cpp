@@ -266,9 +266,9 @@ void print_exception(const std::exception& ex, bool initial = true)
 {
 	auto location = Support::Exception::location(ex);
 	auto cause = Support::Exception::cause(ex);
-	auto prefix = (initial ? "Exception:" : "> Caused by:");
+	auto prefix = (initial ? "Exception:" : "Caused by:");
 
-	std::fprintf(stderr, "%s %s at file %s line %d\n", prefix, ex.what(), location.file(), location.line());
+	std::fprintf(stderr, "ERROR: %s %s at file %s line %d\n", prefix, ex.what(), location.file(), location.line());
 
 	if (cause) {
 		try {
@@ -304,11 +304,11 @@ template<class Device, class ... Parameters> int do_feed(bool statistics, const 
 					try {
 						operation.execute(pipe, input);
 					} catch (Piper::DeviceCaptureException& ex) {
-						std::fprintf(stderr, "WARN: feed restarted due to capture exception\n");
+						std::fprintf(stderr, "WARN: Restart feed operation due to capture exception\n");
 					}
 				}
 			} catch (ReloadException& ex) {
-				std::fprintf(stderr, "INFO: program reloaded due to signal\n");
+				std::fprintf(stderr, "INFO: Reload program due to signal\n");
 			}
 		}
 	} catch (QuitException& ex) {
@@ -316,11 +316,11 @@ template<class Device, class ... Parameters> int do_feed(bool statistics, const 
 	} catch (Piper::EndOfFileException& ex) {
 		return 0;
 	} catch (std::exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot feed pipe due to exception\n");
+		std::fprintf(stderr, "ERROR: Cannot feed pipe due to exception\n");
 		print_exception(ex);
 		return 3;
 	} catch (...) {
-		std::fprintf(stderr, "ERROR: cannot feed pipe\n\n");
+		std::fprintf(stderr, "ERROR: Cannot feed pipe\n\n");
 		return 3;
 	}
 
@@ -350,23 +350,23 @@ template<class Device, class ... Parameters> int do_drain(bool statistics, const
 					try {
 						operation.execute(pipe, output);
 					} catch (Piper::DrainDataLossException& ex) {
-						std::fprintf(stderr, "WARN: drain restarted due to pipe buffer overrun\n");
+						std::fprintf(stderr, "WARN: Restart drain operation due to pipe buffer overrun\n");
 					} catch (Piper::DevicePlaybackException& ex) {
-						std::fprintf(stderr, "WARN: drain restarted due to playback exception\n");
+						std::fprintf(stderr, "WARN: Restart drain operation due to playback exception\n");
 					}
 				}
 			} catch (ReloadException& ex) {
-				std::fprintf(stderr, "INFO: program reloaded due to signal\n");
+				std::fprintf(stderr, "INFO: Reload program due to signal\n");
 			}
 		}
 	} catch (QuitException& ex) {
 		return 0;
 	} catch (std::exception& ex) {
-		std::fprintf(stderr, "ERROR: cannot drain pipe due to exception\n");
+		std::fprintf(stderr, "ERROR: Cannot drain pipe due to exception\n");
 		print_exception(ex);
 		return 3;
 	} catch (...) {
-		std::fprintf(stderr, "ERROR: cannot drain pipe\n\n");
+		std::fprintf(stderr, "ERROR: Cannot drain pipe\n\n");
 		return 3;
 	}
 
@@ -389,19 +389,19 @@ int create(int argc, char **argv)
 		unsigned int separation = std::atoi(argv[9]);
 
 		if (snd_pcm_format_value(format) == SND_PCM_FORMAT_UNKNOWN) {
-			std::fprintf(stderr, "ERROR: format %s is not recognized\n\n", format);
+			std::fprintf(stderr, "ERROR: Format %s is not recognized\n\n", format);
 			return 2;
 		} else if (channels == 0) {
-			std::fprintf(stderr, "ERROR: channels cannot be zero\n\n");
+			std::fprintf(stderr, "ERROR: Channels cannot be zero\n\n");
 			return 2;
 		} else if (rate == 0) {
-			std::fprintf(stderr, "ERROR: rate cannot be zero\n\n");
+			std::fprintf(stderr, "ERROR: Rate cannot be zero\n\n");
 			return 2;
 		} else if (readable <= 1) {
-			std::fprintf(stderr, "ERROR: readable should be larger than 1\n\n");
+			std::fprintf(stderr, "ERROR: Readable should be larger than 1\n\n");
 			return 2;
 		} else if (writable <= 1) {
-			std::fprintf(stderr, "ERROR: writable should be larger than 1\n\n");
+			std::fprintf(stderr, "ERROR: Writable should be larger than 1\n\n");
 			return 2;
 		}
 
@@ -409,7 +409,7 @@ int create(int argc, char **argv)
 			Piper::Pipe pipe(argv[2], format, channels, rate, period, readable, writable, separation, 0640);
 			return 0;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot create pipe due to exception\n");
+			std::fprintf(stderr, "ERROR: Cannot create pipe due to exception\n");
 			print_exception(ex);
 			return 3;
 		}
@@ -435,7 +435,7 @@ int info(int argc, char **argv)
 
 			std::fprintf(stderr, "\n");
 			std::fprintf(stderr, "  Pipe details\n");
-			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, " ------------------------------------------------------\n");
 			std::fprintf(stderr, "  Format: %s\n", pipe.format_name());
 			std::fprintf(stderr, "  Channels: %u\n", pipe.channels());
 			std::fprintf(stderr, "  Sampling Rate: %u\n", pipe.rate());
@@ -446,7 +446,7 @@ int info(int argc, char **argv)
 			std::fprintf(stderr, "  Capacity: %u periods or %zu bytes or %lu ns\n", pipe.capacity(), pipe.capacity_size(), pipe.capacity_time());
 			std::fprintf(stderr, "\n");
 			std::fprintf(stderr, "  Transport details\n");
-			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, " ------------------------------------------------------\n");
 			std::fprintf(stderr, "  Slot Count: %u\n", backer.slot_count());
 			std::fprintf(stderr, "  Component Count: %u\n", backer.component_count());
 			std::fprintf(stderr, "  Metadata Size: %zu\n", backer.metadata_size());
@@ -463,7 +463,7 @@ int info(int argc, char **argv)
 			std::fprintf(stderr, " bytes\n");
 			std::fprintf(stderr, "\n");
 			std::fprintf(stderr, "  Layout details\n");
-			std::fprintf(stderr, " ======================================================\n");
+			std::fprintf(stderr, " ------------------------------------------------------\n");
 			std::fprintf(stderr, "  Header Offset: %zu\n", backer.header_offset());
 			std::fprintf(stderr, "  Metadata Offset: %zu\n", backer.metadata_offset());
 			std::fprintf(stderr, "  Component Offsets: ");
@@ -482,7 +482,7 @@ int info(int argc, char **argv)
 
 			return 0;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot dump pipe due to exception\n");
+			std::fprintf(stderr, "ERROR: Cannot dump pipe due to exception\n");
 			print_exception(ex);
 			return 3;
 		}
@@ -530,7 +530,7 @@ int feed(int argc, char **argv)
 	} else if (strncmp(device, "alsa:", 5) == 0) {
 		return do_feed<Piper::AlsaCaptureDevice>(statistics, path, device + 5);
 	} else {
-		std::fprintf(stderr, "ERROR: unknown capture device %s\n", device);
+		std::fprintf(stderr, "ERROR: Unknown capture device %s\n", device);
 		return 1;
 	}
 }
@@ -572,7 +572,7 @@ int drain(int argc, char **argv)
 	} else if (strncmp(device, "alsa:", 5) == 0) {
 		return do_drain<Piper::AlsaPlaybackDevice>(statistics, path, device + 5);
 	} else {
-		std::fprintf(stderr, "ERROR: unknown capture device %s\n", device);
+		std::fprintf(stderr, "ERROR: Unknown playback device %s\n", device);
 		return 1;
 	}
 }
@@ -592,7 +592,7 @@ int unclog(int argc, char **argv)
 
 			return 0;
 		} catch (std::exception& ex) {
-			std::fprintf(stderr, "ERROR: cannot unclog pipe due to exception\n");
+			std::fprintf(stderr, "ERROR: Cannot unclog pipe due to exception\n");
 			print_exception(ex);
 			return 3;
 		}
@@ -621,10 +621,10 @@ int main(int argc, char **argv)
 		return unclog(argc, argv);
 	} else if (argc >= 2) {
 		std::fprintf(stderr, "ERROR: Unknown subcommand %s\n", argv[1]);
-		std::fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog <parameter>...\n\n", argv[0]);
 		return 1;
 	} else {
-		std::fprintf(stderr, "Usage: %s create|feed|drain <parameter>...\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog <parameter>...\n\n", argv[0]);
 		return 0;
 	}
 }
