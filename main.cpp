@@ -285,7 +285,7 @@ void print_exception(const std::exception& ex, bool initial = true)
 /**
  * Feed pipe from the given device.
  */
-template<class Device, class ... Parameters> int do_feed(const char* path, Parameters ... args)
+template<class Device, class ... Parameters> int do_feed(bool statistics, const char* path, Parameters ... args)
 {
 	try {
 		::signal(SIGTERM, trigger_quit);
@@ -294,7 +294,7 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 		::signal(SIGHUP, trigger_reload);
 
 		while (true) {
-			Callback callback(true);
+			Callback callback(statistics);
 			Piper::FeedOperation operation(callback);
 			Piper::Pipe pipe(path);
 			Device input(args...);
@@ -331,7 +331,7 @@ template<class Device, class ... Parameters> int do_feed(const char* path, Param
 /**
  * Drain pipe to the given device.
  */
-template<class Device, class ... Parameters> int do_drain(const char* path, Parameters ... args)
+template<class Device, class ... Parameters> int do_drain(bool statistics, const char* path, Parameters ... args)
 {
 	try {
 		::signal(SIGTERM, trigger_quit);
@@ -340,7 +340,7 @@ template<class Device, class ... Parameters> int do_drain(const char* path, Para
 		::signal(SIGHUP, trigger_reload);
 
 		while (true) {
-			Callback callback(true);
+			Callback callback(statistics);
 			Piper::DrainOperation operation(callback);
 			Piper::Pipe pipe(path);
 			Device output(args...);
@@ -499,24 +499,38 @@ int info(int argc, char **argv)
  */
 int feed(int argc, char **argv)
 {
-	if (argc < 3) {
+	char* path = nullptr;
+	char* device = nullptr;
+	bool statistics = false;
+
+	for (int i = 2; i < argc; i++) {
+		if (std::strcmp(argv[i], "-s") == 0) {
+			statistics = true;
+		} else if (path == nullptr) {
+			path = argv[i];
+		} else if (device == nullptr) {
+			device = argv[i];
+		}
+	}
+
+	if (path == nullptr) {
 		std::fprintf(stderr, "ERROR: Missing arguments\n");
-		std::fprintf(stderr, "Usage: %s feed <path> [<device>]\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s feed [-s] <path> [<device>]\n\n", argv[0]);
 		return 1;
 	}
 
-	if (argc == 3) {
-		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "-") == 0) {
-		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "stdin") == 0) {
-		return do_feed<Piper::StdinCaptureDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "alsa") == 0) {
-		return do_feed<Piper::AlsaCaptureDevice>(argv[2], "default");
-	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
-		return do_feed<Piper::AlsaCaptureDevice>(argv[2], argv[3] + 5);
+	if (device == nullptr) {
+		return do_feed<Piper::StdinCaptureDevice>(statistics, path);
+	} else if (strcmp(device, "-") == 0) {
+		return do_feed<Piper::StdinCaptureDevice>(statistics, path);
+	} else if (strcmp(device, "stdin") == 0) {
+		return do_feed<Piper::StdinCaptureDevice>(statistics, path);
+	} else if (strcmp(device, "alsa") == 0) {
+		return do_feed<Piper::AlsaCaptureDevice>(statistics, path, "default");
+	} else if (strncmp(device, "alsa:", 5) == 0) {
+		return do_feed<Piper::AlsaCaptureDevice>(statistics, path, device + 5);
 	} else {
-		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
+		std::fprintf(stderr, "ERROR: unknown capture device %s\n", device);
 		return 1;
 	}
 }
@@ -527,24 +541,38 @@ int feed(int argc, char **argv)
  */
 int drain(int argc, char **argv)
 {
-	if (argc < 3) {
+	char* path = nullptr;
+	char* device = nullptr;
+	bool statistics = false;
+
+	for (int i = 2; i < argc; i++) {
+		if (std::strcmp(argv[i], "-s") == 0) {
+			statistics = true;
+		} else if (path == nullptr) {
+			path = argv[i];
+		} else if (device == nullptr) {
+			device = argv[i];
+		}
+	}
+
+	if (path == nullptr) {
 		std::fprintf(stderr, "ERROR: Missing arguments\n");
-		std::fprintf(stderr, "Usage: %s drain <path> [<device>]\n\n", argv[0]);
+		std::fprintf(stderr, "Usage: %s drain [-s] <path> [<device>]\n\n", argv[0]);
 		return 1;
 	}
 
-	if (argc == 3) {
-		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "-") == 0) {
-		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "stdin") == 0) {
-		return do_drain<Piper::StdoutPlaybackDevice>(argv[2]);
-	} else if (argc == 4 && std::strcmp(argv[3], "alsa") == 0) {
-		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], "default");
-	} else if (argc == 4 && strncmp(argv[3], "alsa:", 5) == 0) {
-		return do_drain<Piper::AlsaPlaybackDevice>(argv[2], argv[3] + 5);
+	if (device == nullptr) {
+		return do_drain<Piper::StdoutPlaybackDevice>(statistics, path);
+	} else if (strcmp(device, "-") == 0) {
+		return do_drain<Piper::StdoutPlaybackDevice>(statistics, path);
+	} else if (strcmp(device, "stdin") == 0) {
+		return do_drain<Piper::StdoutPlaybackDevice>(statistics, path);
+	} else if (strcmp(device, "alsa") == 0) {
+		return do_drain<Piper::AlsaPlaybackDevice>(statistics, path, "default");
+	} else if (strncmp(device, "alsa:", 5) == 0) {
+		return do_drain<Piper::AlsaPlaybackDevice>(statistics, path, device + 5);
 	} else {
-		std::fprintf(stderr, "ERROR: unknown capture device %s\n", argv[3]);
+		std::fprintf(stderr, "ERROR: unknown capture device %s\n", device);
 		return 1;
 	}
 }
