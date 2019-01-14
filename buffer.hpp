@@ -6,6 +6,7 @@
 #include <exception>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include "exception.hpp"
@@ -53,44 +54,10 @@ namespace Piper
 			}
 
 			/**
-			 * Copy constructor. It creates a new buffer that points to the same
-			 * memory region as the old buffer.
-			 */
-			Buffer(const Buffer& buffer) :
-				m_start(buffer.m_start),
-				m_size(buffer.m_size)
-			{
-				// empty
-			}
-
-			/**
-			 * Move constructor. Since a buffer do not own the memory region,
-			 * there are no reason to invalidate the source buffer. Hence the
-			 * move constructor is essentially the same as copy constructor.
-			 */
-			Buffer(const Buffer&& buffer) :
-				m_start(buffer.m_start),
-				m_size(buffer.m_size)
-			{
-				// empty
-			}
-
-			/**
-			 * Move constructor. Since a buffer do not own the memory region,
-			 * there are no reason to invalidate the source buffer. Hence the
-			 * move constructor is essentially the same as copy constructor.
-			 */
-			Buffer(Buffer&& buffer) :
-				m_start(buffer.m_start),
-				m_size(buffer.m_size)
-			{
-				// empty
-			}
-
-			/**
 			 * Construct a new buffer backed by the given pointer to struct.
 			 */
-			template<typename T> explicit Buffer(T* start) :
+			template<typename T, typename std::conditional<std::is_base_of<Buffer,T>::value, void, bool>::type = false>
+			explicit Buffer(T* start) :
 				m_start(reinterpret_cast<char*>(start)),
 				m_size(sizeof(T))
 			{
@@ -102,45 +69,12 @@ namespace Piper
 			/**
 			 * Construct a new buffer backed by the given reference to struct.
 			 */
-			template<typename T> explicit Buffer(T& start) :
-				m_start(reinterpret_cast<char*>(&start)),
+			template<typename T, typename std::conditional<std::is_base_of<Buffer,T>::value, void, bool>::type = false>
+			explicit Buffer(T& start) :
+				m_start(reinterpret_cast<char*>(std::addressof(start))),
 				m_size(sizeof(T))
 			{
 				// empty
-			}
-
-			/**
-			 * Construct a new buffer backed by the given reference to struct.
-			 */
-			template<typename T> explicit Buffer(T&& start) :
-				m_start(reinterpret_cast<char*>(&start)),
-				m_size(sizeof(T))
-			{
-				// empty
-			}
-
-			/**
-			 * Copy assignment operator. It updates this buffer to point to
-			 * the memory region referred by the other buffer.
-			 */
-			Buffer& operator=(const Buffer& buffer)
-			{
-				m_start = buffer.m_start;
-				m_size = buffer.m_size;
-				return *this;
-			}
-
-			/**
-			 * Move assignment operator. Since a buffer do not own the memory
-			 * region, there are no reason to invalidate the source buffer.
-			 * Hence the move assignment operator is essentially the same as
-			 * copy assignment operator.
-			 */
-			Buffer& operator=(Buffer&& buffer)
-			{
-				m_start = buffer.m_start;
-				m_size = buffer.m_size;
-				return *this;
 			}
 
 			/**
