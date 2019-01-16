@@ -351,13 +351,13 @@ namespace Piper
 			Duration period = m_pipe.period_time();
 
 			while (m_transport.until() == current) {
-				Duration limit = period * (m_transport.active() ? 1 : 10);
-				Duration slice = std::min(Duration(timeout), limit * 1000000);
+				int limit = (period / 1000000) * (m_transport.active() ? 1 : 10);
+				int slice = std::min(timeout, limit);
 				timeout -= slice;
 
 				struct timespec wait;
-				wait.tv_sec = slice / 1000000000;
-				wait.tv_nsec = slice % 1000000000;
+				wait.tv_sec = slice / 1000;
+				wait.tv_nsec = (slice % 1000) * 1000000;
 
 				if (::nanosleep(&wait, NULL) < 0) {
 					switch (errno) {
