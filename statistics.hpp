@@ -215,14 +215,14 @@ namespace Support
 
 		};
 
-		Average make_average() { return Average(1); }
-		Average make_average(int N) { return Average(N); }
-		template<typename T> Filter<T> make_filter(T child) { return Filter<T>(child, DBL_MIN, DBL_MAX); }
-		template<typename T> Filter<T> make_filter(T child, double lower, double upper) { return Filter<T>(child, lower, upper); }
-		template<typename T> Magnitude<T> make_magnitude(T child) { return Magnitude<T>(child); }
-		template<typename T> Divergence<T> make_divergence(T child) { return Divergence<T>(child, 0.0); }
-		template<typename T> Divergence<T> make_divergence(T child, double reference) { return Divergence<T>(child, reference); }
-		template<typename T> Delta<T> make_delta(T child) { return Delta<T>(child); }
+		inline Average make_average() { return Average(1); }
+		inline Average make_average(int N) { return Average(N); }
+		template<typename T> inline Filter<T> make_filter(T child) { return Filter<T>(child, DBL_MIN, DBL_MAX); }
+		template<typename T> inline Filter<T> make_filter(T child, double lower, double upper) { return Filter<T>(child, lower, upper); }
+		template<typename T> inline Magnitude<T> make_magnitude(T child) { return Magnitude<T>(child); }
+		template<typename T> inline Divergence<T> make_divergence(T child) { return Divergence<T>(child, 0.0); }
+		template<typename T> inline Divergence<T> make_divergence(T child, double reference) { return Divergence<T>(child, reference); }
+		template<typename T> inline Delta<T> make_delta(T child) { return Delta<T>(child); }
 
 	}
 
