@@ -32,17 +32,17 @@ namespace Piper
 			/**
 			 * Called when a feed operation begins.
 			 */
-			virtual void on_begin_feed(const Pipe& pipe, const CaptureDevice& device) {}
+			virtual void on_begin_feed([[ gnu::unused ]] const Pipe& pipe, [[ gnu::unused ]] const CaptureDevice& device) {}
 
 			/**
 			 * Called when a drain operation begins.
 			 */
-			virtual void on_begin_drain(const Pipe& pipe, const PlaybackDevice& device) {}
+			virtual void on_begin_drain([[ gnu::unused ]] const Pipe& pipe, [[ gnu::unused ]] const PlaybackDevice& device) {}
 
 			/**
 			 * Called whenever a transfer from/into the pipe occured.
 			 */
-			virtual void on_transfer(const Preamble& preamble, const Buffer& buffer) {}
+			virtual void on_transfer([[ gnu::unused ]] const Preamble& preamble, [[ gnu::unused ]] const Buffer& buffer) {}
 
 			/**
 			 * Called whenever an operation reaches a point where its execution

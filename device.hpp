@@ -218,7 +218,7 @@ namespace Piper
 			/**
 			 * Do nothing.
 			 */
-			void configure(const Pipe& pipe, unsigned int prebuffer) override {}
+			void configure([[ gnu::unused ]] const Pipe& pipe, [[ gnu::unused ]] unsigned int prebuffer) override {}
 
 			/**
 			 * Do nothing.
@@ -275,7 +275,7 @@ namespace Piper
 			/**
 			 * Do nothing.
 			 */
-			void configure(const Pipe& pipe) override {}
+			void configure([[ gnu::unused ]] const Pipe& pipe) override {}
 
 			/**
 			 * Do nothing.

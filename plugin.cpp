@@ -123,7 +123,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		/**
 		 * Configure the playback device before its creation.
 		 */
-		void configure(const char* name, snd_pcm_stream_t stream, int mode, ALSA::IOPlug::Options& options)
+		void configure(const char* name, [[ gnu::unused ]] snd_pcm_stream_t stream, [[ gnu::unused ]] int mode, ALSA::IOPlug::Options& options)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -211,7 +211,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * ensure that the pump thread will watch the timer and periodically
 		 * flush blocks into the pipe.
 		 */
-		void start(ALSA::IOPlug::Control& control)
+		void start([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -230,7 +230,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * Additionally, this callback will deactivate the signpost to reflect
 		 * the fact that the device is no longer accepting audio data.
 		 */
-		void stop(ALSA::IOPlug::Control& control)
+		void stop([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -245,7 +245,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * Return the number of descriptors that should be polled by the client
 		 * for device events. This callback will return 1 for signpost descriptor.
 		 */
-		int poll_descriptors_count(ALSA::IOPlug::Control& control)
+		int poll_descriptors_count([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			std::lock_guard<std::mutex> guard(m_mutex);
 			return 1;
@@ -255,7 +255,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * Return the details of descriptors that should be polled by the client
 		 * for device events. See the other poll callbacks for more information.
 		 */
-		int poll_descriptors(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
+		int poll_descriptors([[ gnu::unused ]] ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
 		{
 			assert(pfd != nullptr);
 			assert(space >= 1);
@@ -275,7 +275,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * POLLOUT events. It is because signpost descriptor can only be polled
 		 * for POLLIN events but the application expects POLLOUT events.
 		 */
-		void poll_revents(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
+		void poll_revents([[ gnu::unused ]] ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 		{
 			assert(pfd != nullptr);
 			assert(revents != nullptr);
@@ -493,7 +493,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		 * Close the device. This callback will update the status to END and wait
 		 * until the pump thread finishes.
 		 */
-		void close(ALSA::IOPlug::Control& control)
+		void close([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			m_status = Status::END;
 			m_pump.join();
@@ -639,7 +639,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		/**
 		 * Configure the capture device before its creation.
 		 */
-		void configure(const char* name, snd_pcm_stream_t stream, int mode, ALSA::IOPlug::Options& options)
+		void configure(const char* name, [[ gnu::unused ]] snd_pcm_stream_t stream, [[ gnu::unused ]] int mode, ALSA::IOPlug::Options& options)
 		{
 			options.name = name;
 			options.enable_prepare_callback = true;
@@ -679,7 +679,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
  		 * This callback will deactivate the signpost to report that the device
 		 * cannot be read from yet.
 		 */
-		void prepare(ALSA::IOPlug::Control& control)
+		void prepare([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			m_signpost.deactivate();
 		}
@@ -693,7 +693,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		 * hardware pointer updates. It will also initialize the cursor to point
 		 * to the end of pipe read window.
 		 */
-		void start(ALSA::IOPlug::Control& control)
+		void start([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			m_timer.start();
 			m_cursor = m_outlet.until();
@@ -707,7 +707,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		 * The callback will stop the timer and deactivate the signpost to reflect
 		 * the situation.
 		 */
-		void stop(ALSA::IOPlug::Control& control)
+		void stop([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			m_timer.stop();
 			m_signpost.deactivate();
@@ -723,7 +723,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		 * descriptor is responsible for advertising availability of data in the
 		 * device buffer and hence opportunities of non-blocking reads.
 		 */
-		int poll_descriptors_count(ALSA::IOPlug::Control& control)
+		int poll_descriptors_count([[ gnu::unused ]] ALSA::IOPlug::Control& control)
 		{
 			return 2;
 		}
@@ -732,7 +732,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		 * Return the details of descriptors that should be polled by the client
 		 * for device events. See the other poll callbacks for more information.
 		 */
-		int poll_descriptors(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
+		int poll_descriptors([[ gnu::unused ]] ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int space)
 		{
 			assert(pfd != nullptr);
 			assert(space >= 2);
@@ -751,7 +751,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 		 * Check the poll result and return the device events. Note that the
 		 * callback will not need to mangle event codes.
 		 */
-		void poll_revents(ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
+		void poll_revents([[ gnu::unused ]] ALSA::IOPlug::Control& control, struct pollfd* pfd, unsigned int nfds, unsigned short* revents)
 		{
 			assert(pfd != nullptr);
 			assert(revents != nullptr);

@@ -123,7 +123,7 @@ class Callback : public Piper::Callback
 		 * involves setting up the parameters and counters used for statistics
 		 * computation.
 		 */
-		void on_begin_feed(const Piper::Pipe& pipe, const Piper::CaptureDevice& device)
+		void on_begin_feed(const Piper::Pipe& pipe, [[ gnu::unused ]] const Piper::CaptureDevice& device)
 		{
 			if (m_tracking) {
 				double period = convert_duration(pipe.period_time());
@@ -142,7 +142,7 @@ class Callback : public Piper::Callback
 		 * involves setting up the parameters and counters used for statistics
 		 * computation.
 		 */
-		void on_begin_drain(const Piper::Pipe& pipe, const Piper::PlaybackDevice& device)
+		void on_begin_drain(const Piper::Pipe& pipe, [[ gnu::unused ]] const Piper::PlaybackDevice& device)
 		{
 			if (m_tracking) {
 				double period = convert_duration(pipe.period_time());
@@ -161,7 +161,7 @@ class Callback : public Piper::Callback
 		/**
 		 * Handle data transfer during the feed/drain operation by doing nothing.
 		 */
-		void on_transfer(const Piper::Preamble& preamble, const Piper::Buffer& buffer) override
+		void on_transfer(const Piper::Preamble& preamble, [[ gnu::unused ]] const Piper::Buffer& buffer) override
 		{
 			if (m_tracking) {
 				const double now = convert_timestamp(Piper::now());
@@ -251,7 +251,7 @@ class Callback : public Piper::Callback
 /**
  * Signal handler for setting the reload flag.
  */
-extern "C" void trigger_reload(int signum)
+extern "C" void trigger_reload([[ gnu::unused ]] int signum)
 {
 	reload = true;
 }
@@ -260,7 +260,7 @@ extern "C" void trigger_reload(int signum)
 /**
  * Signal handler for setting the quit flag.
  */
-extern "C" void trigger_quit(int signum)
+extern "C" void trigger_quit([[ gnu::unused ]] int signum)
 {
 	quit = true;
 }
@@ -616,7 +616,7 @@ int unclog(int argc, char **argv)
 /**
  * Print program version.
  */
-int version(int argc, char** argv)
+int version([[ gnu::unused ]] int argc, char** argv)
 {
 	std::fprintf(stderr, "Piper version %d.%d.%d\n", PIPER_VERSION_MAJOR, PIPER_VERSION_MINOR, PIPER_VERSION_PATCH);
 	std::fprintf(stderr, "Usage: %s create|info|feed|drain|unclog|version <parameter>...\n\n", argv[0]);

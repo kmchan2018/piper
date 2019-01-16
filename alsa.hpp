@@ -367,37 +367,37 @@ namespace ALSA
 					 * device constructor. The callback should update the `options`
 					 * parameter to setup the device.
 					 */
-					virtual void configure(const char* name, snd_pcm_stream_t stream, int mode, Options& options) {}
+					virtual void configure([[ gnu::unused ]] const char* name, [[ gnu::unused ]] snd_pcm_stream_t stream, [[ gnu::unused ]] int mode, [[ gnu::unused ]] Options& options) {}
 
 					/**
 					 * The method is called to setup the PCM device after its creation.
 					 * This is the opportunity to configure the restrictions on hardware
 					 * parameters.
 					 */
-					virtual void create(Control& control) {}
+					virtual void create([[ gnu::unused ]] Control& control) {}
 
 					/**
 					 * The method is called to apply new hardware parameters onto the PCM
 					 * device.
 					 */
-					virtual void hw_params(Control& control, snd_pcm_hw_params_t *params) {}
+					virtual void hw_params([[ gnu::unused ]] Control& control, [[ gnu::unused ]] snd_pcm_hw_params_t *params) {}
 
 					/**
 					 * The method is called to clear existing hardware parameters on the PCM
 					 * device.
 					 */
-					virtual void hw_free(Control& control) {}
+					virtual void hw_free([[ gnu::unused ]] Control& control) {}
 
 					/**
 					 * The method is called to apply new software parameters onto the PCM
 					 * device.
 					 */
-					virtual void sw_params(Control& control, snd_pcm_sw_params_t *params) {}
+					virtual void sw_params([[ gnu::unused ]] Control& control, [[ gnu::unused ]] snd_pcm_sw_params_t *params) {}
 
 					/**
 					 * The method is called to prepare the PCM device for playback/capture.
 					 */
-					virtual void prepare(Control& control) {}
+					virtual void prepare([[ gnu::unused ]] Control& control) {}
 
 					/**
 					 * The method is called to start playback/capture on the PCM device.
@@ -413,37 +413,37 @@ namespace ALSA
 					 * The method is called to finish off remaining audio data in the PCM
 					 * device buffer before playback/capture is over.
 					 */
-					virtual void drain(Control& control) {}
+					virtual void drain([[ gnu::unused ]] Control& control) {}
 
 					/**
 					 * The method is called to pause current playback/capture on the PCM
 					 * device.
 					 */
-					virtual void pause(Control& control, int enable) {}
+					virtual void pause([[ gnu::unused ]] Control& control, [[ gnu::unused ]] int enable) {}
 
 					/**
 					 * The method is called to resume the PCM device from suspension.
 					 */
-					virtual void resume(Control& control) {}
+					virtual void resume([[ gnu::unused ]] Control& control) {}
 
 					/**
 					 * The method is called to report the number of file descriptors
 					 * application should poll for updates.
 					 */
-					virtual int poll_descriptors_count(Control& control) { return 0; }
+					virtual int poll_descriptors_count([[ gnu::unused ]] Control& control) { return 0; }
 
 					/**
 					 * The method is called to report the list of file descriptors
 					 * application should poll for updates.
 					 */
-					virtual int poll_descriptors(Control& control, struct pollfd *pfd, unsigned int space) { return 0; }
+					virtual int poll_descriptors([[ gnu::unused ]] Control& control, [[ gnu::unused ]] struct pollfd *pfd, [[ gnu::unused ]] unsigned int space) { return 0; }
 
 					/**
 					 * The method is called to process poll results and return the
 					 * actual event that happened: POLLIN indicates that the PCM device
 					 * can be read; POLLOUT indicates that the PCM device can be written.
 					 */
-					virtual void poll_revents(Control& control, struct pollfd *pfd, unsigned int nfds, unsigned short *revents) { *revents = 0; }
+					virtual void poll_revents([[ gnu::unused ]] Control& control, [[ gnu::unused ]] struct pollfd *pfd, [[ gnu::unused ]] unsigned int nfds, unsigned short *revents) { *revents = 0; }
 
 					/**
 					 * The method is called to query current hardware buffer position of
@@ -455,25 +455,25 @@ namespace ALSA
 					 * The method is called to transfer audio data from/into the PCM device
 					 * buffer.
 					 */
-					virtual snd_pcm_uframes_t transfer(Control& control, const snd_pcm_channel_area_t *areas, snd_pcm_uframes_t offset, snd_pcm_uframes_t size) { return 0; }
+					virtual snd_pcm_uframes_t transfer([[ gnu::unused ]] Control& control, [[ gnu::unused ]] const snd_pcm_channel_area_t *areas, [[ gnu::unused ]] snd_pcm_uframes_t offset, [[ gnu::unused ]] snd_pcm_uframes_t size) { return 0; }
 
 					/**
 					 * The method is called to dump PCM device details to the output.
 					 */
-					virtual void dump(Control& control, snd_output_t* out) {}
+					virtual void dump([[ gnu::unused ]] Control& control, [[ gnu::unused ]] snd_output_t* out) {}
 
 					/**
 					 * The method is called to report the PCM device latency, aka the
 					 * time between audio sample is written and it is played on the
 					 * physical hardware.
 					 */
-					virtual void delay(Control& control, snd_pcm_sframes_t *delayp) {}
+					virtual void delay([[ gnu::unused ]] Control& control, [[ gnu::unused ]] snd_pcm_sframes_t *delayp) {}
 
 					/**
 					 * The method is called to release any resources used by the PCM device
 					 * on close.
 					 */
-					virtual void close(Control& control) {}
+					virtual void close([[ gnu::unused ]] Control& control) {}
 
 			};
 
