@@ -47,6 +47,12 @@ namespace Piper
 		public:
 
 			/**
+			 * Empty virtual destructor to ensure proper destruction of derived
+			 * classes.
+			 */
+			virtual ~PlaybackDevice() {}
+
+			/**
 			 * Configure the playback device for the pipe.
 			 */
 			virtual void configure(const Pipe& pipe, unsigned int prebuffer) = 0;
@@ -131,6 +137,12 @@ namespace Piper
 	class CaptureDevice
 	{
 		public:
+
+			/**
+			 * Empty virtual destructor to ensure proper destruction of derived
+			 * classes.
+			 */
+			virtual ~CaptureDevice() {}
 
 			/**
 			 * Configure the capture device for the pipe.
