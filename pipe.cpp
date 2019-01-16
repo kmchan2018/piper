@@ -37,7 +37,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	std::size_t calculate_frame_size(snd_pcm_format_t format, Channel channels)
+	static inline std::size_t calculate_frame_size(snd_pcm_format_t format, Channel channels)
 	{
 		ssize_t result = snd_pcm_format_size(format, channels);
 		if (result > 0) {
@@ -47,7 +47,7 @@ namespace Piper
 		}
 	}
 
-	std::size_t calculate_period_size(snd_pcm_format_t format, Channel channels, Rate rate, Duration period)
+	static inline std::size_t calculate_period_size(snd_pcm_format_t format, Channel channels, Rate rate, Duration period)
 	{
 		std::size_t frame_size = calculate_frame_size(format, channels);
 		std::size_t scaled_period_size = frame_size * rate * period;
