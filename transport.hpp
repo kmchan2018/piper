@@ -137,6 +137,11 @@ namespace Piper
 			 */
 			std::size_t total_size() const noexcept { return m_total_size; }
 
+			Backer(const Backer& backer) = delete;
+			Backer(Backer&& backer) = delete;
+			Backer& operator=(const Backer& backer) = delete;
+			Backer& operator=(Backer&& backer) = delete;
+
 		private:
 
 			/**
@@ -296,6 +301,11 @@ namespace Piper
 			 * Return the buffer to the a block component.
 			 */
 			Buffer component(unsigned int slot, unsigned int component);
+
+			Medium(const Medium& medium) = delete;
+			Medium(Medium&& medium) = delete;
+			Medium& operator=(const Medium& medium) = delete;
+			Medium& operator=(Medium&& medium) = delete;
 
 		private:
 
