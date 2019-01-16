@@ -284,7 +284,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 			std::lock_guard<std::mutex> guard(m_mutex);
 
 			for (unsigned int i = 0; i < nfds; i++) {
-				unsigned short temp = pfd[i].revents;
+				unsigned short temp = static_cast<unsigned short>(pfd[i].revents);
 
 				if (temp != 0 && (temp & POLLIN) != 0) {
 					*revents = (temp & ~POLLIN) | POLLOUT;
@@ -759,7 +759,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 
 			for (unsigned int i = 0; i < nfds; i++) {
 				if (pfd[i].revents != 0) {
-					*revents = pfd[i].revents;
+					*revents = static_cast<unsigned short>(pfd[i].revents);
 					return;
 				}
 			}

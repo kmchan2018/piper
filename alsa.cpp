@@ -564,7 +564,7 @@ extern "C"
 
 		try {
 			alsa_ioplug_cb_trace(handle, "pointer callback called");
-			snd_pcm_sframes_t result = implementation.pointer(control) % control.buffer_size();
+			snd_pcm_sframes_t result = static_cast<snd_pcm_sframes_t>(implementation.pointer(control) % control.buffer_size());
 			alsa_ioplug_cb_trace(handle, "pointer callback completed");
 			return result;
 		} catch (std::system_error& ex) {
@@ -596,7 +596,7 @@ extern "C"
 
 		try {
 			alsa_ioplug_cb_trace(handle, "transfer callback called");
-			snd_pcm_sframes_t result = implementation.transfer(control, areas, offset, size);
+			snd_pcm_sframes_t result = static_cast<snd_pcm_sframes_t>(implementation.transfer(control, areas, offset, size));
 			alsa_ioplug_cb_trace(handle, "transfer callback completed");
 			return result;
 		} catch (std::system_error& ex) {

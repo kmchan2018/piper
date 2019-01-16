@@ -41,7 +41,7 @@ namespace Piper
 	{
 		ssize_t result = snd_pcm_format_size(format, channels);
 		if (result > 0) {
-			return result;
+			return static_cast<std::size_t>(result);
 		} else {
 			EXC_START(std::invalid_argument("[Piper::calculate_frame_size] Cannot calculate frame size due to invalid format and/or channels"));
 		}
@@ -333,8 +333,8 @@ namespace Piper
 				Duration limit = period * (m_transport.active() ? 1 : 10);
 	
 				struct timespec wait;
-				wait.tv_sec = limit / 1000000000;
-				wait.tv_nsec = limit % 1000000000;
+				wait.tv_sec = static_cast<time_t>(limit / 1000000000);
+				wait.tv_nsec = static_cast<long>(limit % 1000000000);
 	
 				if (::nanosleep(&wait, NULL) < 0) {
 					switch (errno) {
@@ -356,8 +356,8 @@ namespace Piper
 				timeout -= slice;
 
 				struct timespec wait;
-				wait.tv_sec = slice / 1000;
-				wait.tv_nsec = (slice % 1000) * 1000000;
+				wait.tv_sec = static_cast<time_t>(slice / 1000);
+				wait.tv_nsec = static_cast<long>((slice % 1000) * 1000000);
 
 				if (::nanosleep(&wait, NULL) < 0) {
 					switch (errno) {

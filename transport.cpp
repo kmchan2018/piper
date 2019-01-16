@@ -66,7 +66,7 @@ namespace Piper
 		m_file(path, O_RDWR|O_CREAT|O_EXCL, mode),
 		m_slot_count(slots),
 		m_component_count(components.size()),
-		m_page_size(::sysconf(_SC_PAGESIZE)),
+		m_page_size(static_cast<std::size_t>(::sysconf(_SC_PAGESIZE))),
 		m_header_offset(0),
 		m_header_size(sizeof(Header)),
 		m_metadata_offset(m_page_size),
@@ -116,9 +116,9 @@ namespace Piper
 
 		try {
 			m_file.truncate(m_total_size);
-			m_file.seek(m_header_offset, SEEK_SET);
+			m_file.seek(static_cast<std::int64_t>(m_header_offset), SEEK_SET);
 			m_file.writeall(Buffer(&header));
-			m_file.seek(m_metadata_offset, SEEK_SET);
+			m_file.seek(static_cast<std::int64_t>(m_metadata_offset), SEEK_SET);
 			m_file.writeall(metadata);
 			m_file.flush();
 		} catch (std::invalid_argument& ex) {
@@ -135,7 +135,7 @@ namespace Piper
 		m_file(path, O_RDWR),
 		m_slot_count(0),
 		m_component_count(0),
-		m_page_size(::sysconf(_SC_PAGESIZE)),
+		m_page_size(static_cast<std::size_t>(::sysconf(_SC_PAGESIZE))),
 		m_header_offset(0),
 		m_header_size(sizeof(Header)),
 		m_metadata_offset(m_page_size),

@@ -232,7 +232,7 @@ namespace Piper
 		ssize_t done = ::read(m_descriptor, start, size);
 
 		if (done > 0) {
-			return done;
+			return static_cast<std::size_t>(done);
 		} else if (done < 0 && errno == EINTR) {
 			return 0;
 		} else if (done < 0 && errno == EAGAIN) {
@@ -373,7 +373,7 @@ namespace Piper
 		ssize_t done = ::write(m_descriptor, start, size);
 
 		if (done >= 0) {
-			return done;
+			return static_cast<std::size_t>(done);
 		} else if (errno == EINTR) {
 			return 0;
 		} else if (errno == EAGAIN) {
@@ -504,7 +504,7 @@ namespace Piper
 			EXC_START(FileNotWritableException("[Piper::File::truncate] Cannot truncate file due to open mode"));
 		}
 
-		if (::ftruncate(m_descriptor, length) < 0) {
+		if (::ftruncate(m_descriptor, static_cast<off_t>(length)) < 0) {
 			switch (errno) {
 				case EINVAL: EXC_START(std::invalid_argument("[Piper::File::truncate] Cannot truncate file due to invalid length"));
 				case EFBIG: EXC_START(std::invalid_argument("[Piper::File::truncate] Cannot truncate file due to invalid length"));

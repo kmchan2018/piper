@@ -64,10 +64,10 @@ namespace Piper
 	void Timer::start()
 	{
 		struct itimerspec interval;
-		interval.it_value.tv_sec = m_period / 1000000000;
-		interval.it_value.tv_nsec = m_period % 1000000000;
-		interval.it_interval.tv_sec = m_period / 1000000000;
-		interval.it_interval.tv_nsec = m_period % 1000000000;
+		interval.it_value.tv_sec = static_cast<time_t>(m_period / 1000000000);
+		interval.it_value.tv_nsec = static_cast<long>(m_period % 1000000000);
+		interval.it_interval.tv_sec = static_cast<time_t>(m_period / 1000000000);
+		interval.it_interval.tv_nsec = static_cast<long>(m_period % 1000000000);
 
 		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
 			m_ticks = 0;
@@ -149,8 +149,8 @@ namespace Piper
 
 				if (received > 0) {
 					m_destination += received;
-					m_consumed += received;
-					m_remainder -= received;
+					m_consumed += static_cast<std::size_t>(received);
+					m_remainder -= static_cast<std::size_t>(received);
 
 					if (m_remainder == 0) {
 						m_ticks += m_overrun;

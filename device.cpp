@@ -147,7 +147,7 @@ namespace Piper
 				snd_pcm_sframes_t written = snd_pcm_writei(pcm, buffer, count);
 
 				if (written >= 0) {
-					return written;
+					return static_cast<snd_pcm_uframes_t>(written);
 				} else if (written == -EAGAIN) {
 					return 0;
 				} else if (written == -EWOULDBLOCK) {
@@ -357,7 +357,7 @@ namespace Piper
 				snd_pcm_sframes_t read = snd_pcm_readi(pcm, buffer, count);
 
 				if (read >= 0) {
-					return read;
+					return static_cast<snd_pcm_uframes_t>(read);
 				} else if (read == -EAGAIN) {
 					return 0;
 				} else if (read == -EWOULDBLOCK) {
