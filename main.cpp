@@ -126,7 +126,7 @@ class Callback : public Piper::Callback
 		void on_begin_feed(const Piper::Pipe& pipe, const Piper::CaptureDevice& device)
 		{
 			if (m_tracking) {
-				double period = timestamp(pipe.period_time());
+				double period = convert_duration(pipe.period_time());
 				int count = int(1000.0 / period);
 
 				m_operation = FEED;
@@ -145,7 +145,7 @@ class Callback : public Piper::Callback
 		void on_begin_drain(const Piper::Pipe& pipe, const Piper::PlaybackDevice& device)
 		{
 			if (m_tracking) {
-				double period = timestamp(pipe.period_time());
+				double period = convert_duration(pipe.period_time());
 				int count = int(1000.0 / period);
 
 				m_operation = DRAIN;
@@ -164,8 +164,8 @@ class Callback : public Piper::Callback
 		void on_transfer(const Piper::Preamble& preamble, const Piper::Buffer& buffer) override
 		{
 			if (m_tracking) {
-				const double now = timestamp(Piper::now());
-				const double current = timestamp(preamble.timestamp);
+				const double now = convert_timestamp(Piper::now());
+				const double current = convert_timestamp(preamble.timestamp);
 				const bool first = m_first;
 
 				m_first = false;
@@ -221,11 +221,19 @@ class Callback : public Piper::Callback
 	private:
 
 		/**
-		 * Convert timestamps to microsecond floats.
+		 * Convert timestamps to milliseconds floats.
 		 */
-		double timestamp(Piper::Timestamp timestamp)
+		double convert_timestamp(Piper::Timestamp timestamp)
 		{
 			return double(timestamp) / 1000000.0;
+		}
+
+		/**
+		 * Convert durations to milliseconds floats.
+		 */
+		double convert_duration(Piper::Duration duration)
+		{
+			return double(duration) / 1000000.0;
 		}
 
 		bool m_tracking;
