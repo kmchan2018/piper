@@ -274,8 +274,8 @@ void print_exception(const std::exception& ex, bool initial = true)
 	if (cause) {
 		try {
 			std::rethrow_exception(cause);
-		} catch (std::exception& ex) {
-			print_exception(ex, false);
+		} catch (std::exception& next) {
+			print_exception(next, false);
 		} catch (...) {
 			// don't care
 		}
