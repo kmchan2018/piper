@@ -24,6 +24,12 @@ namespace Piper
 		public:
 
 			/**
+			 * Empty virtual destructor to ensure proper destruction of derived
+			 * classes.
+			 */
+			virtual ~Callback() {}
+
+			/**
 			 * Called when a feed operation begins.
 			 */
 			virtual void on_begin_feed(const Pipe& pipe, const CaptureDevice& device) {}
@@ -48,11 +54,6 @@ namespace Piper
 			 * Called when the current operation ends.
 			 */
 			virtual void on_end() {}
-
-			/**
-			 * Destruct the callback instance.
-			 */
-			virtual ~Callback() {}
 
 	};
 
