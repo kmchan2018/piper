@@ -181,7 +181,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, int mode) :
+	Pipe::Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, unsigned int mode) :
 		m_metadata(format, channels, rate, period, readable, writable),
 		m_backer(path, Buffer(m_metadata), std::vector<std::size_t>{ sizeof(Preamble), m_metadata.m_period_size }, readable + writable + separation, mode),
 		m_medium(m_backer),

@@ -57,7 +57,7 @@ namespace Piper
 			 * Create a new pipe with the given parameters. The method will
 			 * throw exception when it cannot create the file.
 			 */
-			explicit Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, int mode); 
+			explicit Pipe(const char* path, const char* format, Channel channels, Rate rate, Duration period, unsigned int readable, unsigned int writable, unsigned int separation, unsigned int mode);
 
 			/**
 			 * Open an existing pipe. The method will throw exception when it
