@@ -1010,7 +1010,7 @@ extern "C"
 		}
 	}
 
-	SND_PCM_PLUGIN_SYMBOL(piper);
+	SND_PCM_PLUGIN_SYMBOL(piper)
 
 }
 
