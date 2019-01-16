@@ -143,7 +143,7 @@ namespace ALSA
 		return copied;
 	}
 
-};
+}
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -685,7 +685,7 @@ extern "C"
 		return 0;
 	}
 
-};
+}
 
 namespace ALSA
 {
@@ -862,6 +862,6 @@ namespace ALSA
 		return result;
 	}
 
-};
+}
 
 

@@ -110,6 +110,6 @@ namespace Piper
 		}
 	}
 
-};
+}
 
 

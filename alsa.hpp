@@ -562,7 +562,7 @@ namespace ALSA
 		return std::system_error(-EBADF, std::system_category(), "device corrupted");
 	}
 
-};
+}
 
 
 #endif

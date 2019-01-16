@@ -370,6 +370,6 @@ namespace Piper
 		}
 	}
 
-};
+}
 
 

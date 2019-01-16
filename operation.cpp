@@ -128,6 +128,6 @@ namespace Piper
 		device.stop();
 	}
 
-};
+}
 
 

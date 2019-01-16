@@ -111,7 +111,7 @@ namespace Piper
 			using std::runtime_error::runtime_error;
 	};
 
-};
+}
 
 
 #endif

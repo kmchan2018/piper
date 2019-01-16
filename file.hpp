@@ -498,7 +498,7 @@ namespace Piper
 			using FileException::FileException;
 	};
 
-};
+}
 
 
 #endif

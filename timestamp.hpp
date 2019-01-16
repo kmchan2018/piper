@@ -35,7 +35,7 @@ namespace Piper
 		return Timestamp{ time.tv_sec * 1000000000L + time.tv_nsec };
 	}
 
-};
+}
 
 
 #endif

@@ -226,7 +226,7 @@ namespace Support
 
 	}
 
-};
+}
 
 
 #endif

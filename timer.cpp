@@ -181,6 +181,6 @@ namespace Piper
 		}
 	}
 
-};
+}
 
 

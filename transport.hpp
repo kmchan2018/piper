@@ -532,7 +532,7 @@ namespace Piper
 			using TransportException::TransportException;
 	};
 
-};
+}
 
 
 #endif

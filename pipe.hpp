@@ -407,7 +407,7 @@ namespace Piper
 			using PipeException::PipeException;
 	};
 
-};
+}
 
 
 #endif

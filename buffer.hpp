@@ -519,7 +519,7 @@ namespace Piper
 		return a.swap(b);
 	}
 
-};
+}
 
 
 #endif

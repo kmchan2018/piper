@@ -534,7 +534,7 @@ namespace Piper
 			using DeviceException::DeviceException;
 	};
 
-};
+}
 
 
 #endif

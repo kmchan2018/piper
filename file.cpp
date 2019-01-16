@@ -524,6 +524,6 @@ namespace Piper
 		}
 	}
 
-};
+}
 
 
