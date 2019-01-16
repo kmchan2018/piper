@@ -336,7 +336,7 @@ namespace Piper
 				wait.tv_sec = static_cast<time_t>(limit / 1000000000);
 				wait.tv_nsec = static_cast<long>(limit % 1000000000);
 	
-				if (::nanosleep(&wait, NULL) < 0) {
+				if (::nanosleep(&wait, nullptr) < 0) {
 					switch (errno) {
 						case EINTR: return;
 						case EINVAL: EXC_START(std::logic_error("[Piper::Outlet::watch] Cannot watch for incoming blocks due to unexpected sleep error"));
@@ -359,7 +359,7 @@ namespace Piper
 				wait.tv_sec = static_cast<time_t>(slice / 1000);
 				wait.tv_nsec = static_cast<long>((slice % 1000) * 1000000);
 
-				if (::nanosleep(&wait, NULL) < 0) {
+				if (::nanosleep(&wait, nullptr) < 0) {
 					switch (errno) {
 						case EINTR: return;
 						case EINVAL: EXC_START(std::logic_error("[Piper::Outlet::watch] Cannot watch for incoming blocks due to unexpected sleep error"));

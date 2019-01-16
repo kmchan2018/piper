@@ -69,7 +69,7 @@ namespace Piper
 		interval.it_interval.tv_sec = static_cast<time_t>(m_period / 1000000000);
 		interval.it_interval.tv_nsec = static_cast<long>(m_period % 1000000000);
 
-		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
+		if (::timerfd_settime(m_descriptor, 0, &interval, nullptr) >= 0) {
 			m_ticks = 0;
 		} else {
 			switch (errno) {
@@ -89,7 +89,7 @@ namespace Piper
 		interval.it_interval.tv_sec = 0;
 		interval.it_interval.tv_nsec = 0;
 
-		if (::timerfd_settime(m_descriptor, 0, &interval, NULL) >= 0) {
+		if (::timerfd_settime(m_descriptor, 0, &interval, nullptr) >= 0) {
 			m_ticks = 0;
 		} else {
 			switch (errno) {
