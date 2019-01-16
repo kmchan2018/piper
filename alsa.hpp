@@ -176,7 +176,7 @@ namespace ALSA
 				bool listed = false;
 				bool monotonic = false;
 				int poll_fd = -1;
-				int poll_events = 0;
+				unsigned int poll_events = 0;
 				bool enable_hw_params_callback = false;
 				bool enable_hw_free_callback = false;
 				bool enable_prepare_callback = false;
