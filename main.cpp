@@ -269,7 +269,7 @@ void print_exception(const std::exception& ex, bool initial = true)
 	auto cause = Support::Exception::cause(ex);
 	auto prefix = (initial ? "Exception:" : "Caused by:");
 
-	std::fprintf(stderr, "ERROR: %s %s at file %s line %d\n", prefix, ex.what(), location.file(), location.line());
+	std::fprintf(stderr, "ERROR: %s %s at file %s line %u\n", prefix, ex.what(), location.file(), location.line());
 
 	if (cause) {
 		try {
