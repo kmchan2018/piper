@@ -382,12 +382,12 @@ int create(int argc, char **argv)
 {
 	if (argc >= 10) {
 		const char* format = argv[3];
-		Piper::Channel channels = std::atoi(argv[4]);
-		Piper::Rate rate = std::atoi(argv[5]);
-		Piper::Duration period = std::atoi(argv[6]) * 1000000;
-		unsigned int readable = std::atoi(argv[7]);
-		unsigned int writable = std::atoi(argv[8]);
-		unsigned int separation = std::atoi(argv[9]);
+		Piper::Channel channels = std::strtoul(argv[4], nullptr, 10);
+		Piper::Rate rate = std::strtoul(argv[5], nullptr, 10);
+		Piper::Duration period = std::strtoul(argv[6], nullptr, 10) * 1000000LL;
+		unsigned int readable = std::strtoul(argv[7], nullptr, 10);
+		unsigned int writable = std::strtoul(argv[8], nullptr, 10);
+		unsigned int separation = std::strtoul(argv[9], nullptr, 10);
 
 		if (snd_pcm_format_value(format) == SND_PCM_FORMAT_UNKNOWN) {
 			std::fprintf(stderr, "ERROR: Format %s is not recognized\n\n", format);
