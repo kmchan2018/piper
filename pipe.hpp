@@ -43,7 +43,7 @@ namespace Piper
 		Timestamp timestamp;
 
 		explicit Preamble() : timestamp(now()) {}
-		explicit Preamble(Timestamp timestamp) : timestamp(timestamp) {}
+		explicit Preamble(Timestamp initial) : timestamp(initial) {}
 	};
 
 	/**
