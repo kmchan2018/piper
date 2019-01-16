@@ -19,7 +19,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	void FeedOperation::execute(Pipe& pipe, CaptureDevice& device)
+	[[ noreturn ]] void FeedOperation::execute(Pipe& pipe, CaptureDevice& device)
 	{
 		Inlet inlet(pipe);
 		Inlet::Position cursor(inlet.start());
@@ -63,10 +63,6 @@ namespace Piper
 			device.stop();
 			throw;
 		}
-
-		m_callback.on_end();
-		bucket.stop();
-		device.stop();
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -75,7 +71,7 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	void DrainOperation::execute(Pipe& pipe, PlaybackDevice& device)
+	[[ noreturn ]] void DrainOperation::execute(Pipe& pipe, PlaybackDevice& device)
 	{
 		Outlet outlet(pipe);
 		Outlet::Position cursor(outlet.until());
@@ -122,10 +118,6 @@ namespace Piper
 			device.stop();
 			throw;
 		}
-
-		m_callback.on_end();
-		bucket.stop();
-		device.stop();
 	}
 
 }
