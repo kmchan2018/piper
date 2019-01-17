@@ -338,7 +338,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes that are available for reading.
 			 */
-			unsigned int total() const noexcept
+			std::size_t total() const noexcept
 			{
 				return m_buffer.size();
 			}
@@ -346,7 +346,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes that are already read.
 			 */
-			unsigned int read() const noexcept
+			std::size_t read() const noexcept
 			{
 				return m_buffer.size() - m_remainder;
 			}
@@ -354,7 +354,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes in the buffer to be read.
 			 */
-			unsigned int remainder() const noexcept
+			std::size_t remainder() const noexcept
 			{
 				return m_remainder;
 			}
@@ -371,7 +371,7 @@ namespace Piper
 			/**
 			 * Consume the given amount of data as processed.
 			 */
-			void consume(unsigned int consumed)
+			void consume(std::size_t consumed)
 			{
 				if (consumed <= m_remainder) {
 					m_remainder -= consumed;
@@ -381,8 +381,10 @@ namespace Piper
 			}
 
 		private:
+
 			const Buffer& m_buffer;
-			unsigned int m_remainder;
+			std::size_t m_remainder;
+
 	};
 
 	/**
@@ -416,7 +418,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes that are available for processing.
 			 */
-			unsigned int total() const noexcept
+			std::size_t total() const noexcept
 			{
 				return m_buffer.size();
 			}
@@ -424,7 +426,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes that are already written.
 			 */
-			unsigned int written() const noexcept
+			std::size_t written() const noexcept
 			{
 				return m_buffer.size() - m_remainder;
 			}
@@ -432,7 +434,7 @@ namespace Piper
 			/**
 			 * Return the number of bytes in the buffer to be written.
 			 */
-			unsigned int remainder() const noexcept
+			std::size_t remainder() const noexcept
 			{
 				return m_remainder;
 			}
@@ -449,7 +451,7 @@ namespace Piper
 			/**
 			 * Consume the given amount of data as processed.
 			 */
-			void consume(unsigned int consumed)
+			void consume(std::size_t consumed)
 			{
 				if (consumed <= m_remainder) {
 					m_remainder -= consumed;
@@ -459,8 +461,10 @@ namespace Piper
 			}
 
 		private:
+
 			Buffer& m_buffer;
-			unsigned int m_remainder;
+			std::size_t m_remainder;
+
 	};
 
 	/**
