@@ -29,7 +29,7 @@ configure_file (
 include_directories ("${PROJECT_BINARY_DIR}")
 
 include (GNUInstallDirs)
-add_compile_options (-std=c++11 -Wall)
+add_compile_options (-std=c++11 -Wall -Wextra -pedantic -pedantic-errors -Wabi -Wcast-align -Wcast-qual -Wconversion -Wctor-dtor-privacy -Wdisabled-optimization -Wfloat-equal -Wformat=2 -Wformat-signedness -Winit-self -Winvalid-pch -Wlogical-op -Wmissing-format-attribute -Wmissing-include-dirs -Wmissing-noreturn -Wnoexcept -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wregister -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-null-sentinel -Wstrict-overflow=5 -Wswitch-default -Wswitch-enum -Wundef -Wunsafe-loop-optimizations -Wunused -Wuseless-cast -Wzero-as-null-pointer-constant -Werror)
 add_definitions (-DPIC)
 
 add_library (core OBJECT ${CORE_SOURCES})
