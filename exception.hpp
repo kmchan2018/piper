@@ -28,14 +28,16 @@ namespace Support
 		class Location
 		{
 			public:
-				Location() : m_file(nullptr), m_line(0) {}
-				Location(const char* file, unsigned int line) : m_file(file), m_line(line) { if (file == nullptr) throw std::invalid_argument("file cannot be null"); }
+				Location() : m_valid(false), m_file("unknown"), m_line(0) {}
+				Location(const std::string& file, unsigned int line) : m_valid(true), m_file(file), m_line(line) {}
+				Location(const char* file, unsigned int line) : m_valid(file != nullptr), m_file(file != nullptr ? file : "unknown"), m_line(line) {}
 				virtual ~Location() {}
-				bool valid() const noexcept { return m_file != nullptr; }
-				const char* file() const noexcept { return (m_file != nullptr ? m_file : "unknown"); }
+				bool valid() const noexcept { return m_valid; }
+				const char* file() const noexcept { return m_file.c_str(); }
 				unsigned int line() const noexcept { return m_line; }
 			private:
-				const char* m_file;
+				bool m_valid;
+				std::string m_file;
 				unsigned int m_line;
 		};
 
