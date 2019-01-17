@@ -53,10 +53,8 @@ volatile std::atomic_bool quit;
 class ReloadException : std::exception
 {
 	public:
-		ReloadException(const char* what) : m_what(what) {}
-		const char* what() const noexcept { return m_what; }
-	private:
-		const char* m_what;
+		ReloadException() {}
+		const char* what() const noexcept { return "reloaded"; }
 };
 
 
@@ -66,10 +64,8 @@ class ReloadException : std::exception
 class QuitException : std::exception
 {
 	public:
-		QuitException(const char* what) : m_what(what) {}
-		const char* what() const noexcept { return m_what; }
-	private:
-		const char* m_what;
+		QuitException() {}
+		const char* what() const noexcept { return "quitted"; }
 };
 
 
@@ -210,11 +206,11 @@ class Callback : public Piper::Callback
 			if (quit == true) {
 				reload = false;
 				quit = false;
-				throw QuitException("program termination due to signal");
+				throw QuitException();
 			} else if (reload == true) {
 				reload = false;
 				quit = false;
-				throw ReloadException("program reload due to signal");
+				throw ReloadException();
 			}
 		}
 
