@@ -503,6 +503,11 @@ namespace ALSA
 			 */
 			snd_pcm_t* release() noexcept;
 
+			IOPlug(const IOPlug& ioplug) = delete;
+			IOPlug(IOPlug&& ioplug) = delete;
+			IOPlug& operator=(const IOPlug& ioplug) = delete;
+			IOPlug& operator=(IOPlug&& ioplug) = delete;
+
 		private:
 
 			/**
