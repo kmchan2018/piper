@@ -155,17 +155,17 @@ namespace Piper
 				} else if (written == -EINTR) {
 					return 0;
 				} else if (written == -EPIPE) {
-					EXC_START(EXC_ALSA(-written), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to buffer underrun"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to buffer underrun"));
 				} else if (written == -ESTRPIPE) {
-					EXC_START(EXC_ALSA(-written), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to suspension"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DevicePlaybackException("[Piper::do_write_alsa_pcm] Cannot write to device due to suspension"));
 				} else if (written == -EBADFD) {
-					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to corruption"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to corruption"));
 				} else if (written == -ENOTTY) {
-					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 				} else if (written == -ENODEV) {
-					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device due to disconnection"));
 				} else {
-					EXC_START(EXC_ALSA(-written), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device"));
+					EXC_START(EXC_ALSA(static_cast<int>(-written)), DeviceUnusableException("[Piper::do_write_alsa_pcm] Cannot write to device"));
 				}
 			} else if (err == -EINTR) {
 				return 0;
@@ -365,17 +365,17 @@ namespace Piper
 				} else if (read == -EINTR) {
 					return 0;
 				} else if (read == -EPIPE) {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to buffer underrun"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to buffer underrun"));
 				} else if (read == -ESTRPIPE) {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to suspension"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to suspension"));
 				} else if (read == -EBADFD) {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to corruption"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to corruption"));
 				} else if (read == -ENOTTY) {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 				} else if (read == -ENODEV) {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device due to disconnection"));
 				} else {
-					EXC_START(EXC_ALSA(-read), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device"));
+					EXC_START(EXC_ALSA(static_cast<int>(-read)), DeviceCaptureException("[Piper::do_read_alsa_pcm] Cannot read from device"));
 				}
 			} else if (err == -EINTR) {
 				return 0;

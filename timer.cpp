@@ -5,6 +5,7 @@
 #define _BSD_SOURCE
 
 
+#include <climits>
 #include <cstring>
 #include <exception>
 #include <stdexcept>
@@ -153,7 +154,7 @@ namespace Piper
 					m_remainder -= static_cast<std::size_t>(received);
 
 					if (m_remainder == 0) {
-						m_ticks += m_overrun;
+						m_ticks += static_cast<unsigned int>(std::min<std::uint64_t>(m_ticks + m_overrun, UINT_MAX));
 						m_overrun = 0;
 						m_destination = nullptr;
 						m_consumed = 0;

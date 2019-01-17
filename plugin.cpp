@@ -157,7 +157,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
-			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_inlet.window());
+			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, static_cast<unsigned int>(m_inlet.window()));
 		}
 
 		/**
@@ -287,7 +287,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 				unsigned short temp = static_cast<unsigned short>(pfd[i].revents);
 
 				if (temp != 0 && (temp & POLLIN) != 0) {
-					*revents = (temp & ~POLLIN) | POLLOUT;
+					*revents = static_cast<unsigned short>((temp & ~POLLIN) | POLLOUT);
 					return;
 				} else if (temp != 0) {
 					*revents = temp;
@@ -449,7 +449,7 @@ class PiperPlaybackHandler : public ALSA::IOPlug::Implementation
 		void pump()
 		{
 			int descriptor = m_timer.descriptor();
-			int timeout = m_pipe.period_time() / 1000000L;
+			int timeout = static_cast<int>(m_pipe.period_time() / 1000000ULL);
 
 			struct pollfd pfd;
 			pfd.fd = descriptor;
@@ -667,7 +667,7 @@ class PiperCaptureHandler : public ALSA::IOPlug::Implementation
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_CHANNELS, 1, channels_list);
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_RATE, 1, rate_list);
 			control.set_parameter_list(SND_PCM_IOPLUG_HW_PERIOD_BYTES, 1, period_list);
-			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, m_outlet.window());
+			control.set_parameter_range(SND_PCM_IOPLUG_HW_PERIODS, 2, static_cast<unsigned int>(m_outlet.window()));
 		}
 
 		/**

@@ -89,14 +89,14 @@ namespace Piper
 
 		Header header;
 		header.slot_count = m_slot_count;
-		header.component_count = m_component_count;
-		header.page_size = m_page_size;
-		header.metadata_size = m_metadata_size;
+		header.component_count = static_cast<std::uint32_t>(m_component_count);
+		header.page_size = static_cast<std::uint32_t>(m_page_size);
+		header.metadata_size = static_cast<std::uint32_t>(m_metadata_size);
 		header.writes = 0;
 		header.tickets = 1;
 		header.session = INVALID_SESSION_ID;
 
-		for (unsigned int i = 0; i < m_component_count; i++) {
+		for (unsigned int i = 0; i < header.component_count; i++) {
 			std::size_t component_size = components[i];
 			if (component_size == 0) {
 				EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component size"));
@@ -104,12 +104,12 @@ namespace Piper
 				EXC_START(std::invalid_argument("[Piper::Backer::Backer] Cannot create new backer due to invalid component size"));
 			} else {
 				m_component_offsets[i] = m_total_size;
-				m_component_sizes[i] = header.component_sizes[i] = component_size;
+				m_component_sizes[i] = header.component_sizes[i] = static_cast<std::uint32_t>(component_size);
 				m_total_size = align(m_component_offsets[i] + m_component_sizes[i] * m_slot_count, m_page_size);
 			}
 		}
 
-		for (unsigned int i = m_component_count; i < MAX_COMPONENT_COUNT; i++) {
+		for (unsigned int i = header.component_count; i < MAX_COMPONENT_COUNT; i++) {
 			m_component_offsets[i] = 0;
 			m_component_sizes[i] = header.component_sizes[i] = 0;
 		}
@@ -173,7 +173,7 @@ namespace Piper
 		m_metadata_size = header.metadata_size;
 		m_total_size = align(m_metadata_offset + m_metadata_size, m_page_size);
 
-		for (unsigned int i = 0; i < m_component_count; i++) {
+		for (unsigned int i = 0; i < header.component_count; i++) {
 			std::size_t component_size = header.component_sizes[i];
 			if (component_size == 0) {
 				EXC_START(TransportCorruptedException("Piper::Backer::Backer] Cannot open existing backer due to file corruption"));
@@ -184,7 +184,7 @@ namespace Piper
 			}
 		}
 
-		for (unsigned int i = m_component_count; i < MAX_COMPONENT_COUNT; i++) {
+		for (unsigned int i = header.component_count; i < MAX_COMPONENT_COUNT; i++) {
 			m_component_offsets[i] = 0;
 			m_component_sizes[i] = 0;
 		}
@@ -356,7 +356,7 @@ namespace Piper
 		}
 
 		try {
-			return m_medium.component(position % m_capacity, component);
+			return m_medium.component(static_cast<unsigned int>(position % m_capacity), component);
 		} catch (std::invalid_argument& ex) {
 			EXC_CHAIN(std::logic_error("[Piper::Transport::view] Cannot obtain component view due to invalid argument to underlying component"));
 		}
@@ -388,7 +388,7 @@ namespace Piper
 			}
 
 			try {
-				return m_medium.component(position % m_capacity, component);
+				return m_medium.component(static_cast<unsigned int>(position % m_capacity), component);
 			} catch (std::invalid_argument& ex) {
 				EXC_CHAIN(std::logic_error("[Piper::Transport::input] Cannot obtain component buffer due to invalid argument to underlying component"));
 			}

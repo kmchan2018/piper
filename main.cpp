@@ -6,6 +6,8 @@
 
 
 #include <atomic>
+#include <cctype>
+#include <climits>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -263,6 +265,32 @@ extern "C" void trigger_quit([[ gnu::unused ]] int signum)
 
 
 /**
+ * Parse the given string to an unsigned integer and return it. Return 0
+ * when the parse fails. It can happen due to the following cases, including
+ * improper characters in the string or out-of-range number.
+ */
+unsigned int parse_number(const char* input)
+{
+	if (input == nullptr) {
+		return 0;
+	} else if (std::isdigit(input[0]) == false) {
+		return 0;
+	} else {
+		char* end = nullptr;
+		unsigned long parsed = std::strtoul(input, &end, 10);
+
+		if (*end != '\x00') {
+			return 0;
+		} else if (parsed >= UINT_MAX) {
+			return 0;
+		} else {
+			return static_cast<unsigned int>(parsed);
+		}
+	}
+}
+
+
+/**
  * Print a stack trace of the given exception to standard error stream.
  * The function will walk the exception chain down to the root cause and
  * print them out in that order.
@@ -386,12 +414,12 @@ int create(int argc, char **argv)
 {
 	if (argc >= 10) {
 		const char* format = argv[3];
-		Piper::Channel channels = std::strtoul(argv[4], nullptr, 10);
-		Piper::Rate rate = std::strtoul(argv[5], nullptr, 10);
-		Piper::Duration period = std::strtoul(argv[6], nullptr, 10) * 1000000LL;
-		unsigned int readable = std::strtoul(argv[7], nullptr, 10);
-		unsigned int writable = std::strtoul(argv[8], nullptr, 10);
-		unsigned int separation = std::strtoul(argv[9], nullptr, 10);
+		Piper::Channel channels = parse_number(argv[4]);
+		Piper::Rate rate = parse_number(argv[5]);
+		Piper::Duration period = parse_number(argv[6]) * 1000000ULL;
+		unsigned int readable = parse_number(argv[7]);
+		unsigned int writable = parse_number(argv[8]);
+		unsigned int separation = parse_number(argv[9]);
 
 		if (snd_pcm_format_value(format) == SND_PCM_FORMAT_UNKNOWN) {
 			std::fprintf(stderr, "ERROR: Format %s is not recognized\n\n", format);
@@ -453,7 +481,7 @@ int info(int argc, char **argv)
 			std::fprintf(stderr, "  Transport details\n");
 			std::fprintf(stderr, " ------------------------------------------------------\n");
 			std::fprintf(stderr, "  Slot Count: %u\n", backer.slot_count());
-			std::fprintf(stderr, "  Component Count: %u\n", backer.component_count());
+			std::fprintf(stderr, "  Component Count: %lu\n", backer.component_count());
 			std::fprintf(stderr, "  Metadata Size: %zu\n", backer.metadata_size());
 			std::fprintf(stderr, "  Component Sizes: ");
 

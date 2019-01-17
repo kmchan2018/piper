@@ -37,22 +37,22 @@ namespace Piper
 	//
 	//////////////////////////////////////////////////////////////////////////
 
-	static inline std::size_t calculate_frame_size(snd_pcm_format_t format, Channel channels)
+	static inline std::uint32_t calculate_frame_size(snd_pcm_format_t format, Channel channels)
 	{
 		ssize_t result = snd_pcm_format_size(format, channels);
 		if (result > 0) {
-			return static_cast<std::size_t>(result);
+			return static_cast<std::uint32_t>(result);
 		} else {
 			EXC_START(std::invalid_argument("[Piper::calculate_frame_size] Cannot calculate frame size due to invalid format and/or channels"));
 		}
 	}
 
-	static inline std::size_t calculate_period_size(snd_pcm_format_t format, Channel channels, Rate rate, Duration period)
+	static inline std::uint32_t calculate_period_size(snd_pcm_format_t format, Channel channels, Rate rate, Duration period)
 	{
-		std::size_t frame_size = calculate_frame_size(format, channels);
-		std::size_t scaled_period_size = frame_size * rate * period;
+		std::uint32_t frame_size = calculate_frame_size(format, channels);
+		std::uint64_t scaled_period_size = frame_size * rate * period;
 		if (scaled_period_size % 1000000000 == 0) {
-			return scaled_period_size / 1000000000;
+			return static_cast<std::uint32_t>(scaled_period_size / 1000000000);
 		} else {
 			EXC_START(std::invalid_argument("[Piper::calculate_period_size] Cannot calculate period size due to invalid rate and/or duration"));
 		}
@@ -351,7 +351,7 @@ namespace Piper
 			Duration period = m_pipe.period_time();
 
 			while (m_transport.until() == current) {
-				int limit = (period / 1000000) * (m_transport.active() ? 1 : 10);
+				int limit = static_cast<int>(period / 1000000) * (m_transport.active() ? 1 : 10);
 				int slice = std::min(timeout, limit);
 				timeout -= slice;
 

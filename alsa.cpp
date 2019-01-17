@@ -43,15 +43,15 @@ namespace ALSA
 		} else {
 			m_format = format;
 			m_channels = channels;
-			m_unit = frame_size;
+			m_unit = static_cast<unsigned int>(frame_size);
 			m_areas.resize(channels);
 			m_offset = 0;
 			m_length = 0;
 
 			for (unsigned int i = 0; i < m_channels; i++) {
 				m_areas[i].addr = nullptr;
-				m_areas[i].first = sample_size * i;
-				m_areas[i].step = frame_size * CHAR_BIT;
+				m_areas[i].first = static_cast<unsigned int>(sample_size) * i;
+				m_areas[i].step = static_cast<unsigned int>(frame_size) * CHAR_BIT;
 			}
 		}
 	}

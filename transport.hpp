@@ -120,7 +120,7 @@ namespace Piper
 			/**
 			 * Return the number of the components in each block.
 			 */
-			unsigned int component_count() const noexcept { return m_component_count; }
+			std::size_t component_count() const noexcept { return m_component_count; }
 
 			/**
 			 * Return the offset to the specific component area.
@@ -216,7 +216,7 @@ namespace Piper
 			std::string m_path;
 			File m_file;
 			unsigned int m_slot_count;
-			unsigned int m_component_count;
+			std::size_t m_component_count;
 			std::size_t m_page_size;
 			std::size_t m_header_offset;
 			std::size_t m_header_size;
